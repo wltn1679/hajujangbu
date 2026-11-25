@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#3b6ef5">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="하루장부">
+<title>하루장부</title>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--tx:#1d2433;--sub:#6b7488;--pri:#3b6ef5;--line:#e4e8f1;--red:#e5484d;--grn:#1f9d63;--dot:#f59e0b}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#12151c;--card:#1c212c;--tx:#eef1f7;--sub:#9aa3b5;--pri:#6c93ff;--line:#2c3342;--red:#ff7a7f;--grn:#4cc790;color-scheme:dark}}
+:root[data-theme=dark]{--bg:#12151c;--card:#1c212c;--tx:#eef1f7;--sub:#9aa3b5;--pri:#6c93ff;--line:#2c3342;--red:#ff7a7f;--grn:#4cc790;color-scheme:dark}
+.seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:3px;margin-bottom:12px;gap:3px}
+.seg button{flex:1;background:transparent;color:var(--sub);padding:8px 4px;border-radius:9px}
+.seg button.on{background:var(--pri);color:#fff}
+.wd{cursor:pointer;border-radius:8px;padding:9px 6px}
+.wd.s{background:color-mix(in srgb,var(--pri) 14%,transparent)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,"Malgun Gothic",sans-serif;padding-bottom:calc(70px + env(safe-area-inset-bottom))}
+.wrap{max-width:560px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:4px 0 12px}
+.card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px;border:1px solid var(--line)}
+.row{display:flex;gap:8px;align-items:center}
+.sp{justify-content:space-between}
+.nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.nav b{font-size:17px}
+button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:9px 14px;background:var(--pri);color:#fff}
+button.g{background:transparent;color:var(--sub);border:1px solid var(--line)}
+button.x{background:transparent;color:var(--red);padding:4px 8px}
+input,select{font:inherit;width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--tx)}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.dow{text-align:center;font-size:12px;color:var(--sub);padding:4px 0}
+.d{min-height:54px;border-radius:8px;padding:3px 2px;text-align:center;cursor:pointer;font-size:13px;border:1px solid transparent}
+.d.o{opacity:.3}.d.t{border-color:var(--pri)}.d.s{background:var(--pri);color:#fff}
+.d small{display:block;font-size:10px;color:var(--red);margin-top:2px;word-break:keep-all}
+.d.s small{color:#fff}
+.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--dot);margin-top:4px}
+.sun{color:var(--red)}
+.item{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
+.item:last-child{border:0}
+.item .m{font-size:12px;color:var(--sub)}
+.sum{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sum div{background:var(--bg);border-radius:10px;padding:10px}
+.sum span{font-size:12px;color:var(--sub);display:block}
+.sum b{font-size:18px}
+.bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%;background:var(--pri)}
+.cmp td,.cmp th{padding:6px 4px;font-size:13px;text-align:right}
+.cmp th:first-child,.cmp td:first-child{text-align:left}
+.cmp{width:100%;border-collapse:collapse}
+.cmp th{color:var(--sub);font-weight:500;border-bottom:1px solid var(--line)}
+.up{color:var(--red)}.down{color:var(--grn)}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;background:none;color:var(--sub);border-radius:0;padding:14px}
+nav button.on{color:var(--pri);font-weight:700}
+.note{font-size:12px;color:var(--sub)}
+.hide{display:none}
+.pin{letter-spacing:8px;text-align:center;font-size:22px}
+.msg{color:var(--red);font-size:13px;min-height:18px}
+.banner{background:#fff7e0;color:#7a5800;border-radius:10px;padding:8px 12px;font-size:12px;margin-bottom:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <h1>📒 하루장부</h1>
+ <div id="banner" class="banner hide">예시 데이터가 들어 있어요. <a href="#" id="clearAll" style="color:inherit">전부 지우고 내 기록 시작하기</a></div>
+
+ <section id="tabS">
+  <div class="seg" id="sSeg"><button data-v="m" class="on">월</button><button data-v="w">주</button><button data-v="d">일</button></div>
+  <div class="card hide" id="sRange"><div class="nav"><button class="g" id="sRP">◀</button><b id="sRT"></b><button class="g" id="sRN">▶</button></div><div id="sWk"></div></div>
+  <div class="card" id="sMonth"><div class="nav"><button class="g" id="sPrev">◀</button><b id="sTitle"></b><button class="g" id="sNext">▶</button></div><div class="grid" id="sCal"></div></div>
+  <div class="card"><b id="sDay"></b><div id="sList"></div>
+   <div style="margin-top:10px;display:grid;gap:8px">
+    <div class="row"><input type="time" id="sTime" style="width:130px"><input id="sTitleIn" placeholder="일정 제목"></div>
+    <input id="sMemo" placeholder="메모 (선택)"><button id="sAdd">일정 추가</button>
+   </div></div>
+ </section>
+
+ <section id="tabE" class="hide">
+  <div id="lock" class="card hide">
+   <b id="lockT"></b><p class="note" id="lockD"></p>
+   <input class="pin" id="pin" type="password" inputmode="numeric" maxlength="4" placeholder="••••">
+   <div class="msg" id="lockMsg"></div><button id="pinOk" style="width:100%">확인</button>
+  </div>
+  <div id="eBody" class="hide">
+   <div class="card"><div class="sum">
+     <div><span>이번 주 지출 (일~토)</span><b id="wk"></b></div>
+     <div><span>이번 달 지출</span><b id="mo"></b></div></div></div>
+
+   <div class="seg" id="eSeg"><button data-v="m" class="on">월</button><button data-v="w">주</button><button data-v="d">일</button></div>
+   <div class="card hide" id="eRange"><div class="nav"><button class="g" id="eRP">◀</button><b id="eRT"></b><button class="g" id="eRN">▶</button></div><div id="eWk"></div></div>
+   <div class="card" id="eMonth"><div class="nav"><button class="g" id="ePrev">◀</button><b id="eTitle"></b><button class="g" id="eNext">▶</button></div><div class="grid" id="eCal"></div></div>
+
+   <div class="card"><b id="eDay"></b><div id="eList"></div>
+    <div style="margin-top:10px;display:grid;gap:8px">
+     <div class="row"><input type="number" inputmode="numeric" id="eAmt" placeholder="금액(원)"><select id="eCat" style="width:130px"></select></div>
+     <input id="eMemo" placeholder="내용 (예: 점심)"><button id="eAdd">지출 추가</button></div></div>
+
+   <div class="card"><b>이번 달 분류별 지출</b><div id="cats"></div></div>
+   <button class="g" id="doLock" style="width:100%;margin-bottom:12px">🔒 잠그기</button>
+
+   <div class="card"><b>📊 지난달과 비교</b>
+    <p id="cmpSum" style="margin:8px 0"></p>
+    <table class="cmp" id="cmpT"></table>
+    <p class="note" id="cmpNote"></p></div>
+  </div>
+ </section>
+
+ <div class="card" style="margin-top:12px"><b>⚙️ 앱 설정</b>
+  <div style="display:grid;gap:8px;margin-top:8px">
+   <span class="note">화면 모드</span>
+   <div class="seg" id="thSeg" style="margin:0"><button data-v="auto">자동</button><button data-v="light">☀️ 일반</button><button data-v="dark">🌙 다크</button></div>
+   <span class="note">글자 크기</span>
+   <div class="seg" id="fsSeg" style="margin:0"><button data-v="0.9">작게</button><button data-v="1">보통</button><button data-v="1.15">크게</button><button data-v="1.3">아주 크게</button></div>
+   <button id="install" class="hide">📲 앱으로 설치하기</button>
+   <p class="note" id="iosTip" class="hide" style="display:none">아이폰: Safari 아래 공유 버튼 → "홈 화면에 추가"를 누르면 앱으로 설치돼요.</p>
+   <div class="row"><button class="g" id="exp" style="flex:1">💾 백업 저장</button><button class="g" id="imp" style="flex:1">📂 백업 불러오기</button></div>
+   <input type="file" id="file" accept=".json" class="hide">
+   <p class="note">기록은 이 기기에만 저장돼요. 휴대폰을 바꾸거나 브라우저 데이터를 지우기 전에 백업을 저장해 두세요.</p>
+  </div></div>
+</div>
+<nav><button id="nS" class="on">📅 일정</button><button id="nE">💰 지출</button></nav>
+
+<script>
+const $=id=>document.getElementById(id);
+const CATS=['식비','카페','교통','쇼핑','생활','문화','의료','기타'];
+const won=n=>Math.round(n).toLocaleString('ko-KR')+'원';
+const pad=n=>String(n).padStart(2,'0');
+const key=(y,m,d)=>`${y}-${pad(m+1)}-${pad(d)}`;
+const store={get(k,def){try{const v=localStorage.getItem(k);return v?JSON.parse(v):def}catch(e){return def}},
+ set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+let sched=store.get('hj_sched',null),exp=store.get('hj_exp',null),demo=store.get('hj_demo',false);
+const now=new Date();
+const todayK=key(now.getFullYear(),now.getMonth(),now.getDate());
+let sM=new Date(now.getFullYear(),now.getMonth(),1),eM=new Date(sM),sSel=todayK,eSel=todayK;
+
+/* ---- 예시 데이터 ---- */
+function seed(){
+ let r=7;const rnd=()=>(r=(r*9301+49297)%233280)/233280;
+ sched={};exp={};
+ const y=now.getFullYear(),m=now.getMonth();
+ const addS=(k,t,ti,me)=>(sched[k]=sched[k]||[]).push({id:Math.random().toString(36).slice(2),time:t,title:ti,memo:me||''});
+ const addE=(k,a,c,me)=>(exp[k]=exp[k]||[]).push({id:Math.random().toString(36).slice(2),amt:a,cat:c,memo:me});
+ const fill=(yy,mm,last)=>{
+  for(let d=1;d<=last;d++){
+   const dow=new Date(yy,mm,d).getDay(),k=key(yy,mm,d);
+   if(dow>0&&dow<6){addE(k,Math.round((6500+rnd()*4500)/100)*100,'식비','점심');addE(k,2800,'교통','출퇴근');
+     if(rnd()<.6)addE(k,Math.round((4000+rnd()*1500)/100)*100,'카페','커피');}
+   else{if(rnd()<.8)addE(k,Math.round((12000+rnd()*25000)/100)*100,'식비','외식');
+     if(rnd()<.35)addE(k,Math.round((8000+rnd()*40000)/100)*100,'문화','영화/취미');}
+   if(rnd()<.12)addE(k,Math.round((10000+rnd()*40000)/100)*100,'생활','생필품');
+  }
+  addE(key(yy,mm,1),9900,'문화','구독료');
+  addE(key(yy,mm,Math.min(10,last)),Math.round((40000+rnd()*50000)/100)*100,'쇼핑','옷');
+  addE(key(yy,mm,Math.min(14,last)),23000,'의료','약국/병원');
+ };
+ const pm=new Date(y,m-1,1);
+ fill(pm.getFullYear(),pm.getMonth(),new Date(y,m,0).getDate());
+ fill(y,m,now.getDate());
+ for(const [yy,mm] of [[pm.getFullYear(),pm.getMonth()],[y,m]]){
+  addS(key(yy,mm,3),'10:00','주간 회의','회의실 B');
+  addS(key(yy,mm,8),'19:00','헬스장 PT');
+  addS(key(yy,mm,15),'12:30','동기 모임','강남역');
+  addS(key(yy,mm,22),'15:00','치과 검진','예약 확인');
+ }
+ addS(todayK,'18:00','프로젝트 마감','최종 제출');
+ demo=true;save();store.set('hj_demo',true);
+}
+function save(){store.set('hj_sched',sched);store.set('hj_exp',exp)}
+if(!sched||!exp)seed();
+
+/* ---- 달력 ---- */
+function cal(el,base,sel,onPick,mark){
+ const y=base.getFullYear(),m=base.getMonth();
+ let h=['일','월','화','수','목','금','토'].map((d,i)=>`<div class="dow ${i==0?'sun':''}">${d}</div>`).join('');
+ const first=new Date(y,m,1).getDay(),len=new Date(y,m+1,0).getDate();
+ for(let i=0;i<first;i++)h+='<div></div>';
+ for(let d=1;d<=len;d++){const k=key(y,m,d);
+  h+=`<div class="d ${k==todayK?'t':''} ${k==sel?'s':''}" data-k="${k}">${d}${mark(k)}</div>`}
+ el.innerHTML=h;
+ el.querySelectorAll('.d').forEach(c=>c.onclick=()=>onPick(c.dataset.k));
+}
+const dayTotal=k=>(exp[k]||[]).reduce((a,b)=>a+b.amt,0);
+const short=n=>n>=10000?(n/10000).toFixed(n%10000?1:0).replace('.0','')+'만':n.toLocaleString();
+
+/* ---- 일정 ---- */
+function renderS(){
+ views('s');
+ $('sTitle').textContent=`${sM.getFullYear()}년 ${sM.getMonth()+1}월`;
+ cal($('sCal'),sM,sSel,k=>{sSel=k;renderS()},k=>(sched[k]||[]).length?'<br><span class="dot"></span>':'');
+ $('sDay').textContent=sSel.replace(/-/g,'.')+' 일정';
+ const l=(sched[sSel]||[]).slice().sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+ $('sList').innerHTML=l.length?l.map(i=>`<div class="item"><div><b>${i.time?i.time+' ':''}${esc(i.title)}</b>${i.memo?`<div class="m">${esc(i.memo)}</div>`:''}</div><button class="x" data-id="${i.id}">삭제</button></div>`).join(''):'<p class="note">등록된 일정이 없어요.</p>';
+ $('sList').querySelectorAll('.x').forEach(b=>b.onclick=()=>{sched[sSel]=sched[sSel].filter(i=>i.id!=b.dataset.id);save();renderS()});
+}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+$('sPrev').onclick=()=>{sM=new Date(sM.getFullYear(),sM.getMonth()-1,1);renderS()};
+$('sNext').onclick=()=>{sM=new Date(sM.getFullYear(),sM.getMonth()+1,1);renderS()};
+$('sAdd').onclick=()=>{const t=$('sTitleIn').value.trim();if(!t)return;
+ (sched[sSel]=sched[sSel]||[]).push({id:Math.random().toString(36).slice(2),time:$('sTime').value,title:t,memo:$('sMemo').value.trim()});
+ $('sTitleIn').value=$('sMemo').value=$('sTime').value='';save();renderS()};
+
+/* ---- 지출 ---- */
+function sumRange(y,m,fromD,toD,cat){let s=0;
+ for(let d=fromD;d<=toD;d++)for(const e of exp[key(y,m,d)]||[])if(!cat||e.cat==cat)s+=e.amt;return s}
+function renderE(){
+ views('e');
+ const y=eM.getFullYear(),m=eM.getMonth();
+ $('eTitle').textContent=`${y}년 ${m+1}월`;
+ cal($('eCal'),eM,eSel,k=>{eSel=k;renderE()},k=>{const t=dayTotal(k);return t?`<small>${short(t)}</small>`:''});
+ $('eDay').textContent=eSel.replace(/-/g,'.')+' 지출  '+(dayTotal(eSel)?'· '+won(dayTotal(eSel)):'');
+ const l=exp[eSel]||[];
+ $('eList').innerHTML=l.length?l.map(i=>`<div class="item"><div><b>${won(i.amt)}</b> <span class="m">${i.cat}${i.memo?' · '+esc(i.memo):''}</span></div><button class="x" data-id="${i.id}">삭제</button></div>`).join(''):'<p class="note">지출 기록이 없어요.</p>';
+ $('eList').querySelectorAll('.x').forEach(b=>b.onclick=()=>{exp[eSel]=exp[eSel].filter(i=>i.id!=b.dataset.id);save();renderE()});
+ // 주간/월간 (항상 오늘 기준)
+ const ty=now.getFullYear(),tm=now.getMonth(),td=now.getDate();
+ let wk=0;for(let i=0;i<7;i++){const d=new Date(ty,tm,td-now.getDay()+i);wk+=dayTotal(key(d.getFullYear(),d.getMonth(),d.getDate()))}
+ $('wk').textContent=won(wk);$('mo').textContent=won(sumRange(ty,tm,1,td));
+ renderCmp(ty,tm,td);
+ // 분류별 (보고 있는 달)
+ const last=new Date(y,m+1,0).getDate(),tot=sumRange(y,m,1,last);
+ $('cats').innerHTML=CATS.map(c=>({c,v:sumRange(y,m,1,last,c)})).filter(x=>x.v).sort((a,b)=>b.v-a.v)
+  .map(x=>`<div style="margin-top:8px"><div class="row sp"><span>${x.c}</span><span>${won(x.v)} <span class="note">${Math.round(x.v/tot*100)}%</span></span></div><div class="bar"><i style="width:${x.v/tot*100}%"></i></div></div>`).join('')||'<p class="note">기록 없음</p>';
+}
+function renderCmp(ty,tm,td){
+ const pm=new Date(ty,tm-1,1),py=pm.getFullYear(),pmo=pm.getMonth(),plen=new Date(ty,tm,0).getDate();
+ const curTot=sumRange(ty,tm,1,td),prevTot=sumRange(py,pmo,1,plen);
+ const prevSame=sumRange(py,pmo,1,Math.min(td,plen));
+ const curAvg=curTot/td,prevAvg=prevTot/plen;
+ const diffAvg=prevAvg?(curAvg-prevAvg)/prevAvg*100:0;
+ const cls=v=>v>0?'up':'down',arrow=v=>v>0?'▲':'▼';
+ if(!prevTot){$('cmpSum').textContent='지난달 기록이 없어 비교할 수 없어요.';$('cmpT').innerHTML='';$('cmpNote').textContent='';return}
+ $('cmpSum').innerHTML=`하루 평균 <b>${won(curAvg)}</b>로 지난달(${won(prevAvg)})보다 <b class="${cls(diffAvg)}">${arrow(diffAvg)} ${Math.abs(diffAvg).toFixed(0)}% ${diffAvg>0?'많이':'적게'}</b> 쓰고 있어요.`;
+ const rows=[['하루 평균',curAvg,prevAvg],['같은 기간 합계 (1~'+td+'일)',curTot,prevSame],['지난달 전체 합계',null,prevTot]];
+ let h='<tr><th></th><th>이번 달</th><th>지난달</th><th>차이</th></tr>';
+ for(const [n,a,b] of rows){
+  if(a===null){h+=`<tr><td>${n}</td><td>-</td><td>${won(b)}</td><td>-</td></tr>`;continue}
+  const df=a-b;h+=`<tr><td>${n}</td><td>${won(a)}</td><td>${won(b)}</td><td class="${cls(df)}">${arrow(df)}${won(Math.abs(df))}</td></tr>`}
+ h+='<tr><th colspan="4" style="padding-top:10px">분류별 하루 평균</th></tr>';
+ for(const c of CATS){const a=sumRange(ty,tm,1,td,c)/td,b=sumRange(py,pmo,1,plen,c)/plen;if(!a&&!b)continue;
+  const df=a-b;h+=`<tr><td>${c}</td><td>${won(a)}</td><td>${won(b)}</td><td class="${cls(df)}">${arrow(df)}${won(Math.abs(df))}</td></tr>`}
+ $('cmpT').innerHTML=h;
+ $('cmpNote').textContent='하루 평균 = 월 합계 ÷ 일수 (이번 달은 오늘까지, 지난달은 전체). 빨강은 지난달보다 많이, 초록은 적게 쓴 거예요.';
+}
+$('ePrev').onclick=()=>{eM=new Date(eM.getFullYear(),eM.getMonth()-1,1);renderE()};
+$('eNext').onclick=()=>{eM=new Date(eM.getFullYear(),eM.getMonth()+1,1);renderE()};
+$('eCat').innerHTML=CATS.map(c=>`<option>${c}</option>`).join('');
+$('eAdd').onclick=()=>{const a=parseInt($('eAmt').value);if(!a||a<=0)return;
+ (exp[eSel]=exp[eSel]||[]).push({id:Math.random().toString(36).slice(2),amt:a,cat:$('eCat').value,memo:$('eMemo').value.trim()});
+ $('eAmt').value=$('eMemo').value='';save();renderE()};
+
+/* ---- 비밀번호 ---- */
+const hash=s=>{let h=5381;for(const c of 'hj:'+s)h=((h<<5)+h+c.charCodeAt(0))>>>0;return String(h)};
+function showE(){
+ const pw=store.get('hj_pw',null),open=store.get('hj_open',false);
+ $('lock').classList.add('hide');$('eBody').classList.add('hide');
+ if(pw&&open){$('eBody').classList.remove('hide');renderE();return}
+ $('lock').classList.remove('hide');$('pin').value='';$('lockMsg').textContent='';
+ $('lockT').textContent=pw?'🔒 비밀번호를 입력하세요':'🔑 비밀번호 만들기';
+ $('lockD').textContent=pw?'지출 기록은 비밀번호로 보호돼요.':'지출 탭을 보호할 4자리 숫자를 정하세요. 한 번 만들면 잠그기를 누르기 전까지 다시 묻지 않아요.';
+}
+$('pinOk').onclick=()=>{const v=$('pin').value;
+ if(!/^\d{4}$/.test(v)){$('lockMsg').textContent='숫자 4자리를 입력하세요.';return}
+ const pw=store.get('hj_pw',null);
+ if(!pw){store.set('hj_pw',hash(v));store.set('hj_open',true)}
+ else if(pw===hash(v))store.set('hj_open',true);
+ else{$('lockMsg').textContent='비밀번호가 달라요.';return}
+ showE()};
+$('pin').onkeydown=e=>{if(e.key=='Enter')$('pinOk').click()};
+$('doLock').onclick=()=>{store.set('hj_open',false);showE()};
+
+/* ---- 탭/기타 ---- */
+function tab(e){$('tabS').classList.toggle('hide',e);$('tabE').classList.toggle('hide',!e);
+ $('nS').classList.toggle('on',!e);$('nE').classList.toggle('on',e);if(e)showE();else renderS()}
+$('nS').onclick=()=>tab(false);$('nE').onclick=()=>tab(true);
+function banner(){$('banner').classList.toggle('hide',!demo)}
+$('clearAll').onclick=ev=>{ev.preventDefault();if(!confirm('예시 일정과 지출을 모두 지울까요?'))return;
+ sched={};exp={};demo=false;save();store.set('hj_demo',false);banner();renderS();if(!$('eBody').classList.contains('hide'))renderE()};
+/* ---- 월/주/일 보기 ---- */
+const WD=['일','월','화','수','목','금','토'];
+const pk=k=>new Date(k+'T00:00:00');
+const kd=d=>key(d.getFullYear(),d.getMonth(),d.getDate());
+const addDays=(k,n)=>{const d=pk(k);d.setDate(d.getDate()+n);return kd(d)};
+const V={s:'m',e:'m'};
+function views(p){
+ const v=V[p],sel=p=='s'?sSel:eSel;
+ $(p+'Seg').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v==v));
+ $(p+'Month').classList.toggle('hide',v!='m');
+ $(p+'Range').classList.toggle('hide',v=='m');
+ const md=k=>+k.slice(5,7)+'/'+ +k.slice(8);
+ if(v=='w'){
+  const st=addDays(sel,-pk(sel).getDay());
+  $(p+'RT').textContent=md(st)+' ~ '+md(addDays(st,6));
+  let h='',wt=0;
+  for(let i=0;i<7;i++){const k=addDays(st,i);let body;
+   if(p=='s'){const l=(sched[k]||[]).slice().sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+    body=l.length?l.map(x=>(x.time?x.time+' ':'')+esc(x.title)).join(' · '):'<span class="note">일정 없음</span>'}
+   else{const t=dayTotal(k);wt+=t;body=t?`<b>${won(t)}</b>`:'<span class="note">-</span>'}
+   h+=`<div class="item wd ${k==sel?'s':''}" data-k="${k}"><div><b class="${i==0?'sun':''}">${md(k)} (${WD[i]})</b><div class="m" style="font-size:13px;color:var(--tx)">${body}</div></div></div>`}
+  if(p=='e')h+=`<div class="row sp" style="padding-top:10px"><span class="note">이 주 합계</span><b>${won(wt)}</b></div>`;
+  $(p+'Wk').innerHTML=h;
+  $(p+'Wk').querySelectorAll('.wd').forEach(r=>r.onclick=()=>setSel(p,r.dataset.k));
+ }else if(v=='d'){$(p+'RT').textContent=sel.replace(/-/g,'.')+' ('+WD[pk(sel).getDay()]+')';$(p+'Wk').innerHTML=''}
+}
+function setSel(p,k){const d=pk(k),b=new Date(d.getFullYear(),d.getMonth(),1);
+ if(p=='s'){sSel=k;sM=b;renderS()}else{eSel=k;eM=b;renderE()}}
+for(const p of['s','e']){
+ $(p+'Seg').querySelectorAll('button').forEach(b=>b.onclick=()=>{V[p]=b.dataset.v;setSel(p,p=='s'?sSel:eSel)});
+ $(p+'RP').onclick=()=>setSel(p,addDays(p=='s'?sSel:eSel,V[p]=='w'?-7:-1));
+ $(p+'RN').onclick=()=>setSel(p,addDays(p=='s'?sSel:eSel,V[p]=='w'?7:1));
+}
+
+/* ---- 화면 모드 / 글자 크기 ---- */
+function prefs(){
+ const t=store.get('hj_theme','auto'),f=String(store.get('hj_font',1));
+ if(t=='auto')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme',t);
+ document.querySelector('.wrap').style.zoom=f;
+ $('thSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v==t));
+ $('fsSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v==f));
+}
+$('thSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{store.set('hj_theme',b.dataset.v);prefs()});
+$('fsSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{store.set('hj_font',+b.dataset.v);prefs()});
+prefs();
+
+/* ---- 앱 설치(PWA) / 백업 ---- */
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
+let dip=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();dip=e;$('install').classList.remove('hide')});
+window.addEventListener('appinstalled',()=>$('install').classList.add('hide'));
+$('install').onclick=async()=>{if(!dip)return;dip.prompt();await dip.userChoice;dip=null;$('install').classList.add('hide')};
+if(/iphone|ipad/i.test(navigator.userAgent)&&!navigator.standalone)$('iosTip').style.display='block';
+$('exp').onclick=()=>{
+ const o={sched,exp,pw:store.get('hj_pw',null),demo};
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(o)],{type:'application/json'}));
+ a.download='하루장부-백업-'+todayK+'.json';a.click()};
+$('imp').onclick=()=>$('file').click();
+$('file').onchange=ev=>{const f=ev.target.files[0];if(!f)return;const r=new FileReader();
+ r.onload=()=>{try{const o=JSON.parse(r.result);if(!o.sched||!o.exp)throw 0;
+  if(!confirm('현재 기록을 백업 파일 내용으로 바꿀까요?'))return;
+  sched=o.sched;exp=o.exp;demo=!!o.demo;if(o.pw)store.set('hj_pw',o.pw);save();store.set('hj_demo',demo);banner();renderS();alert('불러왔어요.')}
+  catch(e){alert('올바른 백업 파일이 아니에요.')}};r.readAsText(f);ev.target.value=''};
+
+banner();renderS();
+</script>
+</body>
+</html>
