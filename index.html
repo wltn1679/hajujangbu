@@ -119,8 +119,8 @@ nav button.on{color:var(--pri);font-weight:700}
    <span class="note">☁️ Google 드라이브 동기화</span>
    <p class="note" id="gStatus" style="margin:0"></p>
    <div class="row"><button id="gBtn" style="flex:1">Google로 로그인</button><button class="g hide" id="gOut">로그아웃</button></div>
-   <button id="install" class="hide">📲 앱으로 설치하기</button>
-   <p class="note" id="iosTip" class="hide" style="display:none">아이폰: Safari 아래 공유 버튼 → "홈 화면에 추가"를 누르면 앱으로 설치돼요.</p>
+   <button id="install">📲 앱으로 설치하기</button>
+   <p class="note" id="iosTip" style="display:none"></p>
    <div class="row"><button class="g" id="exp" style="flex:1">💾 백업 저장</button><button class="g" id="imp" style="flex:1">📂 백업 불러오기</button></div>
    <input type="file" id="file" accept=".json" class="hide">
    <p class="note">기록은 이 기기에만 저장돼요. 휴대폰을 바꾸거나 브라우저 데이터를 지우기 전에 백업을 저장해 두세요.</p>
@@ -334,10 +334,18 @@ prefs();
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 let dip=null;
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();dip=e;$('install').classList.remove('hide')});
-window.addEventListener('appinstalled',()=>$('install').classList.add('hide'));
-$('install').onclick=async()=>{if(!dip)return;dip.prompt();await dip.userChoice;dip=null;$('install').classList.add('hide')};
-if(/iphone|ipad/i.test(navigator.userAgent)&&!navigator.standalone)$('iosTip').style.display='block';
+const standalone=()=>matchMedia("(display-mode: standalone)").matches||navigator.standalone;
+function instUI(){const b=$("install"),t=$("iosTip");
+ if(standalone()){b.textContent="✅ 앱으로 설치되어 있어요";b.disabled=true;t.style.display="none";return}
+ b.disabled=false;b.textContent="📲 앱으로 설치하기"}
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();dip=e;instUI()});
+window.addEventListener("appinstalled",()=>{dip=null;instUI()});
+$("install").onclick=async()=>{
+ if(dip){dip.prompt();await dip.userChoice;dip=null;return}
+ const t=$("iosTip"),ios=/iphone|ipad/i.test(navigator.userAgent);
+ t.textContent=ios?"아이폰: Safari 아래 공유 버튼(□↑) → \"홈 화면에 추가\"를 눌러 주세요.":"브라우저 오른쪽 위 ⋮ 메뉴 → \"홈 화면에 추가\" 또는 \"앱 설치\"를 눌러 주세요. (Chrome 권장, 메뉴에 없으면 이미 설치됐을 수 있어요)";
+ t.style.display="block"};
+instUI();
 $('exp').onclick=()=>{
  const o={sched,exp,pw:store.get('hj_pw',null),demo};
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(o)],{type:'application/json'}));
