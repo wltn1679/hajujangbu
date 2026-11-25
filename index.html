@@ -105,7 +105,7 @@ body.ex{--pri:var(--c2)}
    <div class="card"><b id="eDay"></b><div id="eList"></div>
     <div style="margin-top:10px;display:grid;gap:8px">
      <div class="row"><input type="number" inputmode="numeric" id="eAmt" placeholder="금액(원)"><select id="eCat" style="width:130px"></select></div>
-     <input id="eMemo" placeholder="내용 (예: 점심)"><button id="eAdd">지출 추가</button></div></div>
+     <input id="eSub" class="hide" maxlength="20" placeholder="기타 항목 이름 (예: 경조사, 세금)"><input id="eMemo" placeholder="내용 (예: 점심)"><button id="eAdd">지출 추가</button></div></div>
 
    <div class="card"><b>이번 달 분류별 지출</b><div id="cats"></div></div>
    <button class="g" id="doLock" style="width:100%;margin-bottom:12px">🔒 잠그기</button>
@@ -153,7 +153,7 @@ function clean(o){
  for(const k in a){if(!ok(k)||!Array.isArray(a[k]))continue;
   S[k]=a[k].filter(obj).slice(0,500).map(i=>({id:sid(i),time:/^\d{2}:\d{2}$/.test(i.time)?i.time:'',title:str(i.title,200),memo:str(i.memo,500)}))}
  for(const k in b){if(!ok(k)||!Array.isArray(b[k]))continue;
-  E[k]=b[k].filter(obj).slice(0,500).map(i=>({id:sid(i),amt:Math.min(Math.max(Math.round(Number(i.amt))||0,0),1e10),cat:CATS.includes(i.cat)?i.cat:'기타',memo:str(i.memo,200)}))}
+  E[k]=b[k].filter(obj).slice(0,500).map(i=>({id:sid(i),amt:Math.min(Math.max(Math.round(Number(i.amt))||0,0),1e10),cat:CATS.includes(i.cat)?i.cat:'기타',sub:str(i.sub,20),memo:str(i.memo,200)}))}
  return{sched:S,exp:E}}
 const okPw=p=>typeof p=='string'&&/^(v2\$[0-9a-f]{32}\$[0-9a-f]{64}|\d{1,12})$/.test(p);
 let sched=store.get('hj_sched',null),exp=store.get('hj_exp',null),demo=store.get('hj_demo',false);
@@ -238,7 +238,7 @@ function renderE(){
  cal($('eCal'),eM,eSel,k=>{eSel=k;renderE()},k=>{const t=dayTotal(k);return t?`<small>${short(t)}</small>`:''});
  $('eDay').textContent=eSel.replace(/-/g,'.')+' 지출  '+(dayTotal(eSel)?'· '+won(dayTotal(eSel)):'');
  const l=exp[eSel]||[];
- $('eList').innerHTML=l.length?l.map(i=>`<div class="item"><div><b>${won(i.amt)}</b> <span class="m">${esc(i.cat)}${i.memo?' · '+esc(i.memo):''}</span></div><button class="x" data-id="${i.id}">삭제</button></div>`).join(''):'<p class="note">지출 기록이 없어요.</p>';
+ $('eList').innerHTML=l.length?l.map(i=>`<div class="item"><div><b>${won(i.amt)}</b> <span class="m">${esc(i.cat)}${i.sub?'('+esc(i.sub)+')':''}${i.memo?' · '+esc(i.memo):''}</span></div><button class="x" data-id="${i.id}">삭제</button></div>`).join(''):'<p class="note">지출 기록이 없어요.</p>';
  $('eList').querySelectorAll('.x').forEach(b=>b.onclick=()=>{exp[eSel]=exp[eSel].filter(i=>i.id!=b.dataset.id);save();renderE()});
  // 주간/월간 (항상 오늘 기준)
  const ty=now.getFullYear(),tm=now.getMonth(),td=now.getDate();
@@ -274,8 +274,9 @@ $('ePrev').onclick=()=>{eM=new Date(eM.getFullYear(),eM.getMonth()-1,1);renderE(
 $('eNext').onclick=()=>{eM=new Date(eM.getFullYear(),eM.getMonth()+1,1);renderE()};
 $('eCat').innerHTML=CATS.map(c=>`<option>${c}</option>`).join('');
 $('eAdd').onclick=()=>{const a=parseInt($('eAmt').value);if(!a||a<=0)return;
- (exp[eSel]=exp[eSel]||[]).push({id:Math.random().toString(36).slice(2),amt:a,cat:$('eCat').value,memo:$('eMemo').value.trim()});
- $('eAmt').value=$('eMemo').value='';save();renderE()};
+ (exp[eSel]=exp[eSel]||[]).push({id:Math.random().toString(36).slice(2),amt:a,cat:$('eCat').value,sub:$('eCat').value=='기타'?$('eSub').value.trim().slice(0,20):'',memo:$('eMemo').value.trim()});
+ $('eAmt').value=$('eMemo').value=$('eSub').value='';save();renderE()};
+$('eCat').onchange=()=>$('eSub').classList.toggle('hide',$('eCat').value!='기타');
 
 /* ---- 비밀번호 ---- */
 const hash=s=>{let h=5381;for(const c of 'hj:'+s)h=((h<<5)+h+c.charCodeAt(0))>>>0;return String(h)};
