@@ -137,7 +137,20 @@ const pad=n=>String(n).padStart(2,'0');
 const key=(y,m,d)=>`${y}-${pad(m+1)}-${pad(d)}`;
 const store={get(k,def){try{const v=localStorage.getItem(k);return v?JSON.parse(v):def}catch(e){return def}},
  set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+/* 외부에서 들어온 데이터(백업 파일·드라이브)를 안전한 형태로 정리 */
+function clean(o){
+ const S={},E={},ok=k=>/^\d{4}-\d{2}-\d{2}$/.test(k),rid=()=>Math.random().toString(36).slice(2),
+  str=(v,n)=>String(v==null?'':v).slice(0,n),obj=i=>i&&typeof i=='object',
+  sid=i=>str(i.id,24).replace(/[^\w-]/g,'')||rid();
+ const a=obj(o)&&obj(o.sched)?o.sched:{},b=obj(o)&&obj(o.exp)?o.exp:{};
+ for(const k in a){if(!ok(k)||!Array.isArray(a[k]))continue;
+  S[k]=a[k].filter(obj).slice(0,500).map(i=>({id:sid(i),time:/^\d{2}:\d{2}$/.test(i.time)?i.time:'',title:str(i.title,200),memo:str(i.memo,500)}))}
+ for(const k in b){if(!ok(k)||!Array.isArray(b[k]))continue;
+  E[k]=b[k].filter(obj).slice(0,500).map(i=>({id:sid(i),amt:Math.min(Math.max(Math.round(Number(i.amt))||0,0),1e10),cat:CATS.includes(i.cat)?i.cat:'기타',memo:str(i.memo,200)}))}
+ return{sched:S,exp:E}}
+const okPw=p=>typeof p=='string'&&/^(v2\$[0-9a-f]{32}\$[0-9a-f]{64}|\d{1,12})$/.test(p);
 let sched=store.get('hj_sched',null),exp=store.get('hj_exp',null),demo=store.get('hj_demo',false);
+if(sched&&exp){const c=clean({sched,exp});sched=c.sched;exp=c.exp}
 const now=new Date();
 const todayK=key(now.getFullYear(),now.getMonth(),now.getDate());
 let sM=new Date(now.getFullYear(),now.getMonth(),1),eM=new Date(sM),sSel=todayK,eSel=todayK;
@@ -198,7 +211,7 @@ function renderS(){
  cal($('sCal'),sM,sSel,k=>{sSel=k;renderS()},k=>(sched[k]||[]).length?'<br><span class="dot"></span>':'');
  $('sDay').textContent=sSel.replace(/-/g,'.')+' 일정';
  const l=(sched[sSel]||[]).slice().sort((a,b)=>(a.time||'').localeCompare(b.time||''));
- $('sList').innerHTML=l.length?l.map(i=>`<div class="item"><div><b>${i.time?i.time+' ':''}${esc(i.title)}</b>${i.memo?`<div class="m">${esc(i.memo)}</div>`:''}</div><button class="x" data-id="${i.id}">삭제</button></div>`).join(''):'<p class="note">등록된 일정이 없어요.</p>';
+ $('sList').innerHTML=l.length?l.map(i=>`<div class="item"><div><b>${i.time?esc(i.time)+' ':''}${esc(i.title)}</b>${i.memo?`<div class="m">${esc(i.memo)}</div>`:''}</div><button class="x" data-id="${i.id}">삭제</button></div>`).join(''):'<p class="note">등록된 일정이 없어요.</p>';
  $('sList').querySelectorAll('.x').forEach(b=>b.onclick=()=>{sched[sSel]=sched[sSel].filter(i=>i.id!=b.dataset.id);save();renderS()});
 }
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -218,7 +231,7 @@ function renderE(){
  cal($('eCal'),eM,eSel,k=>{eSel=k;renderE()},k=>{const t=dayTotal(k);return t?`<small>${short(t)}</small>`:''});
  $('eDay').textContent=eSel.replace(/-/g,'.')+' 지출  '+(dayTotal(eSel)?'· '+won(dayTotal(eSel)):'');
  const l=exp[eSel]||[];
- $('eList').innerHTML=l.length?l.map(i=>`<div class="item"><div><b>${won(i.amt)}</b> <span class="m">${i.cat}${i.memo?' · '+esc(i.memo):''}</span></div><button class="x" data-id="${i.id}">삭제</button></div>`).join(''):'<p class="note">지출 기록이 없어요.</p>';
+ $('eList').innerHTML=l.length?l.map(i=>`<div class="item"><div><b>${won(i.amt)}</b> <span class="m">${esc(i.cat)}${i.memo?' · '+esc(i.memo):''}</span></div><button class="x" data-id="${i.id}">삭제</button></div>`).join(''):'<p class="note">지출 기록이 없어요.</p>';
  $('eList').querySelectorAll('.x').forEach(b=>b.onclick=()=>{exp[eSel]=exp[eSel].filter(i=>i.id!=b.dataset.id);save();renderE()});
  // 주간/월간 (항상 오늘 기준)
  const ty=now.getFullYear(),tm=now.getMonth(),td=now.getDate();
@@ -267,12 +280,21 @@ function showE(){
  $('lockT').textContent=pw?'🔒 비밀번호를 입력하세요':'🔑 비밀번호 만들기';
  $('lockD').textContent=pw?'지출 기록은 비밀번호로 보호돼요.':'지출 탭을 보호할 4자리 숫자를 정하세요. 한 번 만들면 잠그기를 누르기 전까지 다시 묻지 않아요.';
 }
-$('pinOk').onclick=()=>{const v=$('pin').value;
+const hex=b=>[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
+const hasSubtle=()=>window.crypto&&crypto.subtle;
+async function kdf(pin,sh){const salt=new Uint8Array(sh.match(/../g).map(h=>parseInt(h,16)));
+ const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(pin),'PBKDF2',false,['deriveBits']);
+ return hex(await crypto.subtle.deriveBits({name:'PBKDF2',salt,iterations:150000,hash:'SHA-256'},k,256))}
+async function mkPw(pin){if(!hasSubtle())return hash(pin);const s=hex(crypto.getRandomValues(new Uint8Array(16)));return 'v2$'+s+'$'+await kdf(pin,s)}
+async function chkPw(pin,pw){if(pw.startsWith('v2$')){if(!hasSubtle())return false;const p=pw.split('$');return await kdf(pin,p[1])===p[2]}return pw===hash(pin)}
+$('pinOk').onclick=async()=>{const v=$('pin').value;
  if(!/^\d{4}$/.test(v)){$('lockMsg').textContent='숫자 4자리를 입력하세요.';return}
  const pw=store.get('hj_pw',null);
- if(!pw){store.set('hj_pw',hash(v));store.set('hj_open',true);save()}
- else if(pw===hash(v))store.set('hj_open',true);
- else{$('lockMsg').textContent='비밀번호가 달라요.';return}
+ try{
+  if(!pw){store.set('hj_pw',await mkPw(v));store.set('hj_open',true);save()}
+  else if(await chkPw(v,pw)){store.set('hj_open',true);if(!pw.startsWith('v2$')&&hasSubtle()){store.set('hj_pw',await mkPw(v));save()}}
+  else{$('lockMsg').textContent='비밀번호가 달라요.';return}
+ }catch(e){$('lockMsg').textContent='확인 중 오류가 났어요. 다시 시도해 주세요.';return}
  showE()};
 $('pin').onkeydown=e=>{if(e.key=='Enter')$('pinOk').click()};
 $('doLock').onclick=()=>{store.set('hj_open',false);showE()};
@@ -354,7 +376,7 @@ $('imp').onclick=()=>$('file').click();
 $('file').onchange=ev=>{const f=ev.target.files[0];if(!f)return;const r=new FileReader();
  r.onload=()=>{try{const o=JSON.parse(r.result);if(!o.sched||!o.exp)throw 0;
   if(!confirm('현재 기록을 백업 파일 내용으로 바꿀까요?'))return;
-  sched=o.sched;exp=o.exp;demo=!!o.demo;if(o.pw)store.set('hj_pw',o.pw);save();store.set('hj_demo',demo);banner();renderS();alert('불러왔어요.')}
+  const c=clean(o);sched=c.sched;exp=c.exp;demo=!!o.demo;if(okPw(o.pw))store.set('hj_pw',o.pw);save();store.set('hj_demo',demo);banner();renderS();alert('불러왔어요.')}
   catch(e){alert('올바른 백업 파일이 아니에요.')}};r.readAsText(f);ev.target.value=''};
 
 /* ---- Google 드라이브 동기화 (앱 전용 숨김 폴더에 저장) ---- */
@@ -365,8 +387,8 @@ function gui(){const on=!!tok;$('gOut').classList.toggle('hide',!store.get('hj_g
  $('gBtn').textContent=on?'지금 동기화':(store.get('hj_g',0)?'다시 연결':'Google로 로그인');
  if(!on&&store.get('hj_g',0))gst('연결이 만료됐어요. "다시 연결"을 눌러 주세요.')}
 const payload=()=>({sched,exp,pw:store.get('hj_pw',null),demo,ts:store.get('hj_ts',0)});
-function applyRemote(o){sched=o.sched||{};exp=o.exp||{};demo=!!o.demo;
- if(o.pw)store.set('hj_pw',o.pw);store.set('hj_sched',sched);store.set('hj_exp',exp);store.set('hj_ts',o.ts||0);store.set('hj_demo',demo);
+function applyRemote(o){const c=clean(o);sched=c.sched;exp=c.exp;demo=!!o.demo;
+ if(okPw(o.pw))store.set('hj_pw',o.pw);store.set('hj_sched',sched);store.set('hj_exp',exp);store.set('hj_ts',o.ts||0);store.set('hj_demo',demo);
  banner();renderS();if(!$('eBody').classList.contains('hide'))renderE()}
 async function gFind(){const j=await(await gf("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name%3D'hajujangbu.json'&fields=files(id)")).json();return j.files&&j.files[0]?j.files[0].id:null}
 async function gUp(){const meta={name:'hajujangbu.json',...(fileId?{}:{parents:['appDataFolder']})},b='b'+Date.now();
