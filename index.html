@@ -116,6 +116,9 @@ nav button.on{color:var(--pri);font-weight:700}
    <div class="seg" id="thSeg" style="margin:0"><button data-v="auto">자동</button><button data-v="light">☀️ 일반</button><button data-v="dark">🌙 다크</button></div>
    <span class="note">글자 크기</span>
    <div class="seg" id="fsSeg" style="margin:0"><button data-v="0.9">작게</button><button data-v="1">보통</button><button data-v="1.15">크게</button><button data-v="1.3">아주 크게</button></div>
+   <span class="note">☁️ Google 드라이브 동기화</span>
+   <p class="note" id="gStatus" style="margin:0"></p>
+   <div class="row"><button id="gBtn" style="flex:1">Google로 로그인</button><button class="g hide" id="gOut">로그아웃</button></div>
    <button id="install" class="hide">📲 앱으로 설치하기</button>
    <p class="note" id="iosTip" class="hide" style="display:none">아이폰: Safari 아래 공유 버튼 → "홈 화면에 추가"를 누르면 앱으로 설치돼요.</p>
    <div class="row"><button class="g" id="exp" style="flex:1">💾 백업 저장</button><button class="g" id="imp" style="flex:1">📂 백업 불러오기</button></div>
@@ -127,6 +130,7 @@ nav button.on{color:var(--pri);font-weight:700}
 
 <script>
 const $=id=>document.getElementById(id);
+let tok=null,fileId=null,gTimer=null,gClient=null,gBusy=false;
 const CATS=['식비','카페','교통','쇼핑','생활','문화','의료','기타'];
 const won=n=>Math.round(n).toLocaleString('ko-KR')+'원';
 const pad=n=>String(n).padStart(2,'0');
@@ -168,9 +172,9 @@ function seed(){
   addS(key(yy,mm,22),'15:00','치과 검진','예약 확인');
  }
  addS(todayK,'18:00','프로젝트 마감','최종 제출');
- demo=true;save();store.set('hj_demo',true);
+ demo=true;save();store.set('hj_demo',true);store.set('hj_ts',0);
 }
-function save(){store.set('hj_sched',sched);store.set('hj_exp',exp)}
+function save(){store.set('hj_sched',sched);store.set('hj_exp',exp);store.set('hj_ts',Date.now());if(typeof gPushSoon=='function')gPushSoon()}
 if(!sched||!exp)seed();
 
 /* ---- 달력 ---- */
@@ -266,7 +270,7 @@ function showE(){
 $('pinOk').onclick=()=>{const v=$('pin').value;
  if(!/^\d{4}$/.test(v)){$('lockMsg').textContent='숫자 4자리를 입력하세요.';return}
  const pw=store.get('hj_pw',null);
- if(!pw){store.set('hj_pw',hash(v));store.set('hj_open',true)}
+ if(!pw){store.set('hj_pw',hash(v));store.set('hj_open',true);save()}
  else if(pw===hash(v))store.set('hj_open',true);
  else{$('lockMsg').textContent='비밀번호가 달라요.';return}
  showE()};
@@ -344,6 +348,49 @@ $('file').onchange=ev=>{const f=ev.target.files[0];if(!f)return;const r=new File
   if(!confirm('현재 기록을 백업 파일 내용으로 바꿀까요?'))return;
   sched=o.sched;exp=o.exp;demo=!!o.demo;if(o.pw)store.set('hj_pw',o.pw);save();store.set('hj_demo',demo);banner();renderS();alert('불러왔어요.')}
   catch(e){alert('올바른 백업 파일이 아니에요.')}};r.readAsText(f);ev.target.value=''};
+
+/* ---- Google 드라이브 동기화 (앱 전용 숨김 폴더에 저장) ---- */
+const GCID='763031764294-gl4p84tn8nk1u1mpfno44j11o07j08qi.apps.googleusercontent.com';   // ← Google Cloud에서 만든 OAuth 클라이언트 ID를 여기에 넣으세요
+const gst=t=>$('gStatus').textContent=t;
+const gf=(u,o={})=>fetch(u,{...o,headers:{Authorization:'Bearer '+tok,...(o.headers||{})}}).then(r=>{if(r.status==401){tok=null;gui();throw new Error('auth')}if(!r.ok)throw new Error(r.status);return r});
+function gui(){const on=!!tok;$('gOut').classList.toggle('hide',!store.get('hj_g',0));
+ $('gBtn').textContent=on?'지금 동기화':(store.get('hj_g',0)?'다시 연결':'Google로 로그인');
+ if(!on&&store.get('hj_g',0))gst('연결이 만료됐어요. "다시 연결"을 눌러 주세요.')}
+const payload=()=>({sched,exp,pw:store.get('hj_pw',null),demo,ts:store.get('hj_ts',0)});
+function applyRemote(o){sched=o.sched||{};exp=o.exp||{};demo=!!o.demo;
+ if(o.pw)store.set('hj_pw',o.pw);store.set('hj_sched',sched);store.set('hj_exp',exp);store.set('hj_ts',o.ts||0);store.set('hj_demo',demo);
+ banner();renderS();if(!$('eBody').classList.contains('hide'))renderE()}
+async function gFind(){const j=await(await gf("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name%3D'hajujangbu.json'&fields=files(id)")).json();return j.files&&j.files[0]?j.files[0].id:null}
+async function gUp(){const meta={name:'hajujangbu.json',...(fileId?{}:{parents:['appDataFolder']})},b='b'+Date.now();
+ const body=`--${b}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(meta)}\r\n--${b}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(payload())}\r\n--${b}--`;
+ const u=fileId?`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart&fields=id`:'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id';
+ const j=await(await gf(u,{method:fileId?'PATCH':'POST',headers:{'Content-Type':'multipart/related; boundary='+b},body})).json();fileId=j.id;
+ gst('☁️ 동기화됨 · '+new Date().toLocaleTimeString('ko-KR'))}
+async function gSync(first){if(!tok||gBusy)return;gBusy=true;
+ try{gst('동기화 중…');if(!fileId)fileId=await gFind();
+  if(!fileId){await gUp();return}
+  const r=await(await gf(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`)).json(),lt=store.get('hj_ts',0);
+  if((r.ts||0)>lt){applyRemote(r);gst('☁️ 드라이브 기록을 불러왔어요 · '+new Date().toLocaleTimeString('ko-KR'))}
+  else if((r.ts||0)<lt){
+   if(first&&(r.ts||0)>0&&!confirm('이 기기의 기록이 더 최근이에요.\n[확인] 이 기기 기록으로 드라이브를 덮어쓰기\n[취소] 드라이브 기록 불러오기')){applyRemote(r);gst('☁️ 드라이브 기록을 불러왔어요')}
+   else await gUp()}
+  else gst('☁️ 최신 상태예요')
+ }catch(e){if(e.message!='auth')gst('동기화 실패: '+e.message)}finally{gBusy=false}}
+function gPushSoon(){if(!tok)return;clearTimeout(gTimer);gTimer=setTimeout(async()=>{if(!tok||gBusy)return;gBusy=true;try{if(!fileId)fileId=await gFind();await gUp()}catch(e){if(e.message!='auth')gst('저장 실패: '+e.message)}finally{gBusy=false}},1500)}
+function gInit(){
+ if(!GCID){gst('구글 연동은 설정 준비 중이에요.');$('gBtn').disabled=true;return}
+ if(!location.protocol.startsWith('http')){gst('배포 주소(https)에서만 사용할 수 있어요.');$('gBtn').disabled=true;return}
+ gui();
+ const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';
+ s.onload=()=>{gClient=google.accounts.oauth2.initTokenClient({client_id:GCID,scope:'https://www.googleapis.com/auth/drive.appdata',
+   callback:r=>{if(r.access_token){tok=r.access_token;store.set('hj_g',1);gui();gSync(true)}},error_callback:()=>gui()});
+  if(store.get('hj_g',0))gClient.requestAccessToken({prompt:''})};
+ document.head.appendChild(s);
+ $('gBtn').onclick=()=>{if(tok)gSync(false);else if(gClient)gClient.requestAccessToken({prompt:store.get('hj_g',0)?'':'select_account'})};
+ $('gOut').onclick=()=>{if(tok&&window.google)google.accounts.oauth2.revoke(tok,()=>{});tok=null;fileId=null;store.set('hj_g',0);gst('로그아웃했어요. 이 기기의 기록은 그대로 남아 있어요.');gui();$('gOut').classList.add('hide')};
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&tok)gSync(false)});
+}
+gInit();
 
 banner();renderS();
 </script>
