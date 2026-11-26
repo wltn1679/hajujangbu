@@ -1,0 +1,47 @@
+plugins {
+    id 'com.android.application'
+}
+
+def ksPath = System.getenv("KEYSTORE_PATH")
+
+android {
+    namespace 'kr.hajujangbu.app'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "kr.hajujangbu.app"
+        minSdk 29
+        targetSdk 34
+        versionCode Integer.parseInt(System.getenv("GITHUB_RUN_NUMBER") ?: "1")
+        versionName "1.0"
+    }
+
+    signingConfigs {
+        release {
+            if (ksPath) {
+                storeFile file(ksPath)
+                storeType "pkcs12"
+                storePassword System.getenv("KEYSTORE_PASS")
+                keyAlias "hajujangbu"
+                keyPassword System.getenv("KEYSTORE_PASS")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig ksPath ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+}

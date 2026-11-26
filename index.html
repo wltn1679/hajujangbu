@@ -109,6 +109,14 @@ img.miss{opacity:.35}
 details summary{cursor:pointer;color:var(--pri);font-size:14px;margin-top:10px}
 details ol,details ul{padding-left:20px;margin:8px 0;font-size:13px;line-height:1.7}
 code.u{display:block;word-break:break-all;background:var(--bg);border-radius:8px;padding:8px;font-size:12px;margin:6px 0}
+.inc{color:var(--grn)}.up.inc{color:var(--grn)}
+.d small.inc{color:var(--grn)}.d.s small.inc{color:#fff}
+.sum3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.sum3 div{background:var(--bg);border-radius:10px;padding:8px 6px;text-align:center}
+.sum3 span{font-size:11px;color:var(--sub);display:block}
+.sum3 b{font-size:14px;word-break:keep-all}
+#eAdd.inb{background:var(--grn)}
+#appCard{display:none}
 .pv{background:var(--bg);border-radius:12px;padding:12px;margin-top:10px;display:grid;gap:8px}
 </style>
 </head>
@@ -140,6 +148,14 @@ code.u{display:block;word-break:break-all;background:var(--bg);border-radius:8px
      <div><span>이번 주 지출 (일~토)</span><b id="wk"></b></div>
      <div><span>이번 달 지출</span><b id="mo"></b></div></div></div>
 
+   <div class="card"><b id="setT">월별 정산</b>
+    <div class="sum3" style="margin-top:8px">
+     <div><span>들어온 돈</span><b class="inc" id="setI"></b></div>
+     <div><span>쓴 돈</span><b class="up" id="setO"></b></div>
+     <div><span>남은 돈</span><b id="setN"></b></div></div>
+    <table class="cmp" id="setTb" style="margin-top:10px"></table>
+    <p class="note">남은 돈 = 들어온 돈 − 쓴 돈. 아래 달력의 ◀ ▶로 다른 달도 볼 수 있어요.</p></div>
+
    <div class="card"><b>📥 결제 문자·알림 자동 입력</b>
     <p class="note" style="margin:6px 0 8px">카드 승인 문자나 카카오페이 알림을 붙여넣으면 금액·사용처·분류를 알아서 채워요.</p>
     <textarea id="pTxt" rows="3" placeholder="예) [Web발신] 신한카드(1234)승인 홍*동 4,500원 일시불 11/25 12:30 스타벅스"></textarea>
@@ -165,6 +181,7 @@ code.u{display:block;word-break:break-all;background:var(--bg);border-radius:8px
 
    <div class="card"><b id="eDay"></b><div id="eList"></div>
     <div class="grp">
+     <div class="seg" id="eKind" style="margin:0"><button data-v="out" class="on">💸 쓴 돈</button><button data-v="in">💵 들어온 돈</button></div>
      <div class="row"><input type="number" inputmode="numeric" id="eAmt" placeholder="금액(원)"><select id="eCat" style="width:130px"></select></div>
      <input id="eSub" class="hide" maxlength="20" placeholder="기타 항목 이름 (예: 경조사, 세금)"><input id="eMemo" maxlength="200" placeholder="내용 (예: 점심)"><div id="ePh"></div><button id="eAdd">지출 추가</button></div></div>
 
@@ -207,6 +224,14 @@ code.u{display:block;word-break:break-all;background:var(--bg);border-radius:8px
    <div class="seg" id="fsSeg" style="margin:0"><button data-v="0.9">작게</button><button data-v="1">보통</button><button data-v="1.15">크게</button><button data-v="1.3">아주 크게</button></div>
    <span class="note">결제 문자 자동 입력 (링크·공유로 들어온 문자)</span>
    <div class="seg" id="auSeg" style="margin:0"><button data-v="1">켜기</button><button data-v="0">끄기</button></div>
+   <div id="appCard" class="pv" style="margin:0">
+    <b>📱 알림 자동 입력 (안드로이드 앱)</b>
+    <p class="note" id="appSt" style="margin:0"></p>
+    <button id="appNotif">1. 알림 접근 허용하기</button>
+    <button class="g" id="appInfo">허용이 안 눌릴 때: 앱 정보 열기</button>
+    <button class="g" id="appBat">2. 배터리 제한 풀기 (알림이 끊기지 않게)</button>
+    <p class="note" style="margin:0">앱 정보 → 오른쪽 위 ⋮ → <b>제한된 설정 허용</b>을 누른 뒤 1번을 다시 눌러 주세요.</p>
+   </div>
    <span class="note">☁️ Google 드라이브 동기화 (사진 포함)</span>
    <p class="note" id="gStatus" style="margin:0"></p>
    <div class="row"><button id="gBtn" style="flex:1">Google로 로그인</button><button class="g hide" id="gOut">로그아웃</button></div>
@@ -224,6 +249,8 @@ code.u{display:block;word-break:break-all;background:var(--bg);border-radius:8px
 const $=id=>document.getElementById(id);
 let tok=null,fileId=null,gTimer=null,gClient=null,gBusy=false;
 const CATS=['식비','카페','교통','쇼핑','생활','문화','의료','기타'];
+const INCATS=['월급','용돈','이자','환급','판매','기타'];
+const NA=window.HJAndroid||null;   // 안드로이드 전용 앱 안에서만 존재
 const MOODS=['😄','🙂','😐','😴','😢','😡'];
 const MAXPH=8;
 const won=n=>Math.round(n).toLocaleString('ko-KR')+'원';
@@ -243,7 +270,7 @@ function clean(o){
  for(const k in a){if(!ok(k)||!Array.isArray(a[k]))continue;
   S[k]=a[k].filter(obj).slice(0,500).map(i=>({id:sid(i),time:/^\d{2}:\d{2}$/.test(i.time)?i.time:'',title:str(i.title,200),memo:str(i.memo,500),ph:phs(i.ph)}))}
  for(const k in b){if(!ok(k)||!Array.isArray(b[k]))continue;
-  E[k]=b[k].filter(obj).slice(0,500).map(i=>({id:sid(i),amt:Math.min(Math.max(Math.round(Number(i.amt))||0,0),1e10),cat:CATS.includes(i.cat)?i.cat:'기타',sub:str(i.sub,20),memo:str(i.memo,200),ph:phs(i.ph),auto:!!i.auto}))}
+  E[k]=b[k].filter(obj).slice(0,500).map(i=>({id:sid(i),amt:Math.min(Math.max(Math.round(Number(i.amt))||0,0),1e10),kind:i.kind=='in'?'in':'out',cat:(i.kind=='in'?INCATS:CATS).includes(i.cat)?i.cat:'기타',sub:str(i.sub,20),memo:str(i.memo,200),ph:phs(i.ph),auto:!!i.auto}))}
  for(const k in c){if(!ok(k)||!obj(c[k]))continue;const i=c[k];
   const e={mood:MOODS.includes(i.mood)?i.mood:'',title:str(i.title,100),text:str(i.text,20000),ph:phs(i.ph),ts:Number(i.ts)||0};
   if(e.mood||e.title||e.text||e.ph.length)D[k]=e}
@@ -262,7 +289,8 @@ function seed(){
  sched={};exp={};
  const y=now.getFullYear(),m=now.getMonth();
  const addS=(k,t,ti,me)=>(sched[k]=sched[k]||[]).push({id:rid(),time:t,title:ti,memo:me||'',ph:[]});
- const addE=(k,a,c,me)=>(exp[k]=exp[k]||[]).push({id:rid(),amt:a,cat:c,sub:'',memo:me,ph:[],auto:false});
+
+ const addE=(k,a,c,me,kind)=>(exp[k]=exp[k]||[]).push({id:rid(),amt:a,kind:kind||'out',cat:c,sub:'',memo:me,ph:[],auto:false});
  const fill=(yy,mm,last)=>{
   for(let d=1;d<=last;d++){
    const dow=new Date(yy,mm,d).getDay(),k=key(yy,mm,d);
@@ -275,6 +303,7 @@ function seed(){
   addE(key(yy,mm,1),9900,'문화','구독료');
   addE(key(yy,mm,Math.min(10,last)),Math.round((40000+rnd()*50000)/100)*100,'쇼핑','옷');
   addE(key(yy,mm,Math.min(14,last)),23000,'의료','약국/병원');
+addE(key(yy,mm,Math.min(25,last)),2800000,'월급','급여','in');addE(key(yy,mm,Math.min(5,last)),150000,'용돈','용돈','in');
  };
  const pm=new Date(y,m-1,1);
  fill(pm.getFullYear(),pm.getMonth(),new Date(y,m,0).getDate());
@@ -382,7 +411,10 @@ function cal(el,base,sel,onPick,mark){
  el.innerHTML=h;
  el.querySelectorAll('.d').forEach(c=>c.onclick=()=>onPick(c.dataset.k));
 }
-const dayTotal=k=>(exp[k]||[]).reduce((a,b)=>a+b.amt,0);
+const isIn=e=>e.kind=='in';
+const dayTotal=k=>(exp[k]||[]).reduce((a,b)=>a+(isIn(b)?0:b.amt),0);
+const dayIn=k=>(exp[k]||[]).reduce((a,b)=>a+(isIn(b)?b.amt:0),0);
+const sgn=n=>(n>0?'+':n<0?'−':'')+won(Math.abs(n));
 const short=n=>n>=10000?(n/10000).toFixed(n%10000?1:0).replace('.0','')+'만':n.toLocaleString();
 
 /* ---- 일정 ---- */
@@ -415,26 +447,42 @@ function editS(k,it){const ph=it.ph.slice();
 /* ---- 지출 ---- */
 let ePhA=[],ePhB;
 function sumRange(y,m,fromD,toD,cat){let s=0;
- for(let d=fromD;d<=toD;d++)for(const e of exp[key(y,m,d)]||[])if(!cat||e.cat==cat)s+=e.amt;return s}
+ for(let d=fromD;d<=toD;d++)for(const e of exp[key(y,m,d)]||[])if(!isIn(e)&&(!cat||e.cat==cat))s+=e.amt;return s}
+function sumIn(y,m,fromD,toD){let s=0;
+ for(let d=fromD;d<=toD;d++)for(const e of exp[key(y,m,d)]||[])if(isIn(e))s+=e.amt;return s}
+/* 월별 정산: 들어온 돈 / 쓴 돈 / 남은 돈(+·−) */
+function renderSettle(y,m){
+ const mk=(yy,mm)=>{const L=new Date(yy,mm+1,0).getDate(),i=sumIn(yy,mm,1,L),o=sumRange(yy,mm,1,L);return{i,o,n:i-o}};
+ const c=mk(y,m);
+ $('setT').textContent=`${y}년 ${m+1}월 정산`;
+ $('setI').textContent=won(c.i);$('setO').textContent=won(c.o);
+ const nb=$('setN');nb.textContent=sgn(c.n);nb.className=c.n>0?'inc':c.n<0?'up':'';
+ let h='<tr><th>월</th><th>들어온 돈</th><th>쓴 돈</th><th>차액</th></tr>';
+ for(let k=0;k<6;k++){const d=new Date(y,m-k,1),r=mk(d.getFullYear(),d.getMonth());
+  h+=`<tr><td>${d.getFullYear()%100}.${pad(d.getMonth()+1)}</td><td class="inc">${r.i?'+'+won(r.i):'-'}</td><td class="up">${r.o?won(r.o):'-'}</td><td class="${r.n>0?'inc':r.n<0?'up':''}"><b>${r.i||r.o?sgn(r.n):'-'}</b></td></tr>`}
+ $('setTb').innerHTML=h}
 function renderE(){
  views('e');
  const y=eM.getFullYear(),m=eM.getMonth();
  $('eTitle').textContent=`${y}년 ${m+1}월`;
- cal($('eCal'),eM,eSel,k=>{eSel=k;renderE()},k=>{const t=dayTotal(k);return t?`<small>${short(t)}</small>`:''});
- $('eDay').textContent=eSel.replace(/-/g,'.')+' 지출  '+(dayTotal(eSel)?'· '+won(dayTotal(eSel)):'');
+ cal($('eCal'),eM,eSel,k=>{eSel=k;renderE()},k=>{const t=dayTotal(k),n=dayIn(k);return (t?`<small>${short(t)}</small>`:'')+(n?`<small class="inc">+${short(n)}</small>`:'')});
+ const dO=dayTotal(eSel),dI=dayIn(eSel);
+ $('eDay').textContent=eSel.replace(/-/g,'.')+' 내역'+(dO?' · 지출 '+won(dO):'')+(dI?' · 수입 +'+won(dI):'');
  const l=exp[eSel]||[];
- $('eList').innerHTML=l.length?l.map(i=>`<div class="item it" data-id="${i.id}"><div class="bd"><b>${won(i.amt)}</b> <span class="m">${esc(i.cat)}${i.sub?'('+esc(i.sub)+')':''}${i.memo?' · '+esc(i.memo):''}</span>${i.auto?'<span class="tag">자동</span>':''}${thumbs(i.ph)}</div><button class="x" data-id="${i.id}">삭제</button></div>`).join(''):'<p class="note">지출 기록이 없어요.</p>';
+ $('eList').innerHTML=l.length?l.map(i=>`<div class="item it" data-id="${i.id}"><div class="bd"><b class="${isIn(i)?'inc':''}">${isIn(i)?'+':''}${won(i.amt)}</b> <span class="m">${esc(i.cat)}${i.sub?'('+esc(i.sub)+')':''}${i.memo?' · '+esc(i.memo):''}</span>${i.auto?'<span class="tag">자동</span>':''}${thumbs(i.ph)}</div><button class="x" data-id="${i.id}">삭제</button></div>`).join(''):'<p class="note">지출 기록이 없어요.</p>';
  $('eList').querySelectorAll('.x').forEach(b=>b.onclick=()=>delIt(exp,eSel,b.dataset.id,renderE));
  wireList($('eList'),l,it=>editE(eSel,it));
  // 주간/월간 (항상 오늘 기준)
  const ty=now.getFullYear(),tm=now.getMonth(),td=now.getDate();
  let wk=0;for(let i=0;i<7;i++){const d=new Date(ty,tm,td-now.getDay()+i);wk+=dayTotal(key(d.getFullYear(),d.getMonth(),d.getDate()))}
  $('wk').textContent=won(wk);$('mo').textContent=won(sumRange(ty,tm,1,td));
+ renderSettle(y,m);
  renderCmp(ty,tm,td);
  // 분류별 (보고 있는 달)
  const last=new Date(y,m+1,0).getDate(),tot=sumRange(y,m,1,last);
  $('cats').innerHTML=CATS.map(c=>({c,v:sumRange(y,m,1,last,c)})).filter(x=>x.v).sort((a,b)=>b.v-a.v)
   .map(x=>`<div style="margin-top:8px"><div class="row sp"><span>${x.c}</span><span>${won(x.v)} <span class="note">${Math.round(x.v/tot*100)}%</span></span></div><div class="bar"><i style="width:${x.v/tot*100}%"></i></div></div>`).join('')||'<p class="note">기록 없음</p>';
+ $('cats').previousElementSibling.textContent=`${m+1}월 분류별 지출`;
 }
 function renderCmp(ty,tm,td){
  const pm=new Date(ty,tm-1,1),py=pm.getFullYear(),pmo=pm.getMonth(),plen=new Date(ty,tm,0).getDate();
@@ -458,20 +506,30 @@ function renderCmp(ty,tm,td){
 }
 $('ePrev').onclick=()=>{eM=new Date(eM.getFullYear(),eM.getMonth()-1,1);renderE()};
 $('eNext').onclick=()=>{eM=new Date(eM.getFullYear(),eM.getMonth()+1,1);renderE()};
-const catOpts=sel=>CATS.map(c=>`<option${c==sel?' selected':''}>${c}</option>`).join('');
-$('eCat').innerHTML=catOpts();
+const catOpts=(sel,kind)=>(kind=='in'?INCATS:CATS).map(c=>`<option${c==sel?' selected':''}>${c}</option>`).join('');
+let eKind='out';
+function setKind(k){eKind=k;
+ $('eKind').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v==k));
+ $('eCat').innerHTML=catOpts('',k);$('eSub').classList.add('hide');
+ $('eAdd').textContent=k=='in'?'수입 추가':'지출 추가';
+ $('eMemo').placeholder=k=='in'?'내용 (예: 11월 월급, 용돈)':'내용 (예: 점심)';
+ $('eAdd').classList.toggle('inb',k=='in')}
+$('eKind').querySelectorAll('button').forEach(b=>b.onclick=()=>setKind(b.dataset.v));
+setKind('out');
 $('eAdd').onclick=()=>{const a=parseInt($('eAmt').value);if(!a||a<=0)return toast('금액을 입력해 주세요');
- (exp[eSel]=exp[eSel]||[]).push({id:rid(),amt:a,cat:$('eCat').value,sub:$('eCat').value=='기타'?$('eSub').value.trim().slice(0,20):'',memo:$('eMemo').value.trim(),ph:ePhA.slice(),auto:false});
+ (exp[eSel]=exp[eSel]||[]).push({id:rid(),amt:a,kind:eKind,cat:$('eCat').value,sub:$('eCat').value=='기타'?$('eSub').value.trim().slice(0,20):'',memo:$('eMemo').value.trim(),ph:ePhA.slice(),auto:false});
  $('eAmt').value=$('eMemo').value=$('eSub').value='';ePhA.length=0;ePhB.draw();save();renderE()};
 $('eCat').onchange=()=>$('eSub').classList.toggle('hide',$('eCat').value!='기타');
 function editE(k,it){const ph=it.ph.slice();
- const s=sheet(`<b>지출 수정</b><div class="grp"><input type="date" class="fD"><div class="row"><input type="number" inputmode="numeric" class="fA" placeholder="금액(원)"><select class="fK" style="width:130px">${catOpts(it.cat)}</select></div><input class="fB hide" maxlength="20" placeholder="기타 항목 이름"><input class="fM" maxlength="200" placeholder="내용"><div class="fP"></div><div class="row"><button class="g fC" style="flex:1">닫기</button><button class="fS" style="flex:2">저장</button></div></div>`);
+ const s=sheet(`<b>내역 수정</b><div class="grp"><input type="date" class="fD"><select class="fT"><option value="out">💸 지출</option><option value="in">💵 수입</option></select><div class="row"><input type="number" inputmode="numeric" class="fA" placeholder="금액(원)"><select class="fK" style="width:130px">${catOpts(it.cat,it.kind)}</select></div><input class="fB hide" maxlength="20" placeholder="기타 항목 이름"><input class="fM" maxlength="200" placeholder="내용"><div class="fP"></div><div class="row"><button class="g fC" style="flex:1">닫기</button><button class="fS" style="flex:2">저장</button></div></div>`);
  const q=c=>s.el.querySelector(c);q('.fD').value=k;q('.fA').value=it.amt;q('.fB').value=it.sub;q('.fM').value=it.memo;
+ q('.fT').value=it.kind=='in'?'in':'out';
+ q('.fT').onchange=()=>{q('.fK').innerHTML=catOpts('',q('.fT').value);tg()};
  const tg=()=>q('.fB').classList.toggle('hide',q('.fK').value!='기타');tg();q('.fK').onchange=tg;
  photoBox(q('.fP'),ph);q('.fC').onclick=s.close;
  q('.fS').onclick=()=>{const a=parseInt(q('.fA').value);if(!a||a<=0)return toast('금액을 입력해 주세요');
   const nk=/^\d{4}-\d{2}-\d{2}$/.test(q('.fD').value)?q('.fD').value:k;
-  it.amt=a;it.cat=q('.fK').value;it.sub=it.cat=='기타'?q('.fB').value.trim().slice(0,20):'';it.memo=q('.fM').value.trim();it.ph=ph;moveTo(exp,k,nk,it);
+  it.amt=a;it.kind=q('.fT').value=='in'?'in':'out';it.cat=q('.fK').value;it.sub=it.cat=='기타'?q('.fB').value.trim().slice(0,20):'';it.memo=q('.fM').value.trim();it.ph=ph;moveTo(exp,k,nk,it);
   if(nk!=k){eSel=nk;eM=new Date(pk(nk).getFullYear(),pk(nk).getMonth(),1)}
   save();s.close();renderE()}}
 
@@ -491,18 +549,22 @@ function tidyMer(s){
  s=s.replace(/^[\s\d*\-:：·.,]+/,'').replace(/(?:에서|에)\s*(?:결제|승인|사용)?(?:되었습니다|됐습니다|완료|하셨습니다|\s*$).*$/,'');
  s=s.replace(/\s*(?:일시불|할부|\d+개월|결제|승인|사용|완료|안내|알림|되었습니다|합니다|하셨습니다|입니다)\s*$/g,'').replace(/^(?:승인|결제|사용|완료|안내|알림)\s+/,'');
  return s.replace(/[\s:：,.\-·*]+$/,'').trim().slice(0,20)}
-function parsePay(raw){
+const guessInCat=s=>/급여|월급|상여|보너스/.test(s)?'월급':/용돈/.test(s)?'용돈':/이자/.test(s)?'이자':/환급|환불|캐시백|페이백/.test(s)?'환급':'기타';
+function parsePay(raw,dflt){
  let t=String(raw||'').replace(/[​ ]/g,' ').replace(/\s+/g,' ').trim().slice(0,1000);
  if(!t)return null;
  t=t.replace(/^\[(?:Web발신|국제발신|발신)\]\s*/i,'');
- const cancel=/취소|환불/.test(t);
+ const cancel=/취소|환불/.test(t)&&!/입금/.test(t);
  let amt=0,ai=-1,al=0,m;const rx=/(\d{1,3}(?:,\d{3})+|\d+)\s*원/g;
  while((m=rx.exec(t))){const bf=t.slice(Math.max(0,m.index-8),m.index);
   if(/잔액|한도|누적|포인트|적립|잔여|가능/.test(bf))continue;
   amt=parseInt(m[1].replace(/,/g,''),10);ai=m.index;al=m[0].length;break}
+ if(!amt){m=t.match(/(?:입금|출금|지급|이체|승인|결제)\s*[:：]?\s*(\d{1,3}(?:,\d{3})+)(?![\d,])/);   // 은행 문자: "입금 50,000" (원 없음)
+  if(m){amt=parseInt(m[1].replace(/,/g,''),10);ai=m.index+m[0].length-m[1].length;al=m[1].length}}
  if(!amt||amt>1e9)return null;
+ const kind=!cancel&&(/입금|급여|월급|환급|캐시백|지급/.test(t)||/님[이께서]*\s*[^.]{0,20}(?:보냈|송금)/.test(t))&&!/출금|결제|승인|체크카드/.test(t)?'in':'out';
  // 날짜·시간
- let date=todayK,dm=t.match(/(?:(\d{4})[\/.\-])?(\d{1,2})[\/.\-](\d{1,2})\s+(\d{1,2}):(\d{2})/),dEnd=-1;
+ let date=dflt||todayK,dm=t.match(/(?:(\d{4})[\/.\-])?(\d{1,2})[\/.\-](\d{1,2})\s+(\d{1,2}):(\d{2})/),dEnd=-1;
  if(dm){dEnd=dm.index+dm[0].length}
  else{dm=t.match(/(\d{1,2})월\s*(\d{1,2})일(?:\s*(\d{1,2}):(\d{2}))?/);if(dm){dm=[dm[0],undefined,dm[1],dm[2]];dEnd=t.indexOf(dm[0])+dm[0].length}}
  if(dm){const mo=+dm[2],da=+dm[3];let y=dm[1]?+dm[1]:now.getFullYear();
@@ -518,39 +580,70 @@ function parsePay(raw){
  if(GEN.test(mer))mer='';
  if(!mer){const af=t.slice(ai+al).split(/잔액|누적|한도/)[0].replace(/(?:일시불|할부|\d+개월|승인|결제했어요|결제|사용|완료|취소)/g,' ').trim();mer=tidyMer(af)}
  if(GEN.test(mer))mer='';
- return{amt,memo:mer,cat:guessCat(mer||t),date,cancel}}
+ if(kind=='in'){   // 입금: 보낸 사람 이름을 찾아 내용으로
+  let who=(t.match(/([가-힣*]{2,6})\s*님?\s*(?:이|께서)?\s*입금/)||t.match(/입금\s*[\d,]+\s*원?\s*([가-힣*]{2,6})(?![가-힣])/)||t.match(/([가-힣*]{2,6})님[이께서]*\s*[^.]{0,20}보냈/)||[])[1]||'';
+  if(/입금|출금|잔액|원$|계좌|통장/.test(who))who='';
+  return{amt,memo:who?who+' 입금':'입금',cat:guessInCat(t),date,cancel:false,kind:'in'}}
+ return{amt,memo:mer,cat:guessCat(mer||t),date,cancel,kind:'out'}}
 function seenPay(t,mark){const h=hash(String(t).trim()),a=store.get('hj_seen',[]);
  if(a.includes(h))return true;if(mark){a.push(h);store.set('hj_seen',a.slice(-200))}return false}
 function refresh(){if(CUR=='s')renderS();else if(CUR=='e'){if(!$('eBody').classList.contains('hide'))renderE()}else if(!$('dBody').classList.contains('hide'))renderD()}
-function addPay(p,auto){
- const it={id:rid(),amt:p.amt,cat:p.cat,sub:'',memo:p.memo,ph:[],auto:!!auto};
+function addPay(p,auto,quiet){
+ const it={id:rid(),amt:p.amt,kind:p.kind=='in'?'in':'out',cat:p.cat,sub:'',memo:p.memo,ph:[],auto:!!auto};
  (exp[p.date]=exp[p.date]||[]).push(it);save();refresh();
- toast(`💳 ${p.memo||'결제'} ${won(p.amt)} · ${p.cat}  (${p.date.slice(5).replace('-','/')})`,[
+ if(quiet)return;
+ toast(`${it.kind=='in'?'💵 입금 +':'💳 '+(p.memo||'결제')+' '}${won(p.amt)} · ${p.cat}  (${p.date.slice(5).replace('-','/')})`,[
   ['되돌리기',()=>{exp[p.date]=(exp[p.date]||[]).filter(x=>x!==it);if(!exp[p.date].length)delete exp[p.date];save();refresh()}],
   ['보기',()=>{eSel=p.date;eM=new Date(pk(p.date).getFullYear(),pk(p.date).getMonth(),1);tab('e')}]])}
-function cancelPay(p){
+function cancelPay(p,quiet){
  for(let off=0;off<=40;off++){const k=addDays(p.date,-off),a=exp[k]||[];
   for(let i=a.length-1;i>=0;i--){const x=a[i];
-   if(x.amt==p.amt&&(!p.memo||!x.memo||x.memo.includes(p.memo)||p.memo.includes(x.memo))){
+   if(!isIn(x)&&x.amt==p.amt&&(!p.memo||!x.memo||x.memo.includes(p.memo)||p.memo.includes(x.memo))){
     a.splice(i,1);if(!a.length)delete exp[k];save();refresh();
-    toast(`↩️ 취소 반영: ${x.memo||'결제'} ${won(x.amt)} 삭제`,[['되돌리기',()=>{(exp[k]=exp[k]||[]).push(x);save();refresh()}]]);return true}}}
- toast(`취소 문자예요. 같은 금액(${won(p.amt)}) 지출을 찾지 못했어요`);return false}
-function autoPay(text){
- if(store.get('hj_noauto',false))return toast('결제 문자 자동 입력이 꺼져 있어요 (설정에서 켤 수 있어요)');
- const p=parsePay(text);if(!p)return toast('결제 금액을 찾지 못해 추가하지 않았어요');
- if(seenPay(text,true))return toast('이미 반영된 문자예요');
- p.cancel?cancelPay(p):addPay(p,true)}
+    if(!quiet)toast(`↩️ 취소 반영: ${x.memo||'결제'} ${won(x.amt)} 삭제`,[['되돌리기',()=>{(exp[k]=exp[k]||[]).push(x);save();refresh()}]]);return true}}}
+ if(!quiet)toast(`취소 문자예요. 같은 금액(${won(p.amt)}) 지출을 찾지 못했어요`);return false}
+/* 같은 결제가 문자+앱 알림으로 두 번 오는 경우 건너뛰기 (3분 안, 같은 금액·종류) */
+function dupRecent(p,t){const k=`${p.kind}|${p.cancel?'c':'p'}|${p.amt}`,a=store.get('hj_recent',[]);
+ if(a.some(x=>x.k==k&&Math.abs(x.t-t)<180000))return true;
+ a.push({k,t});store.set('hj_recent',a.slice(-30));return false}
+function autoPay(text,opt){opt=opt||{};
+ const say=m=>{if(!opt.quiet)toast(m)};
+ if(store.get('hj_noauto',false)){say('결제 문자 자동 입력이 꺼져 있어요 (설정에서 켤 수 있어요)');return false}
+ const p=parsePay(text,opt.t?kd(new Date(opt.t)):null);if(!p){say('결제 금액을 찾지 못해 추가하지 않았어요');return false}
+ if(seenPay(text,true)){say('이미 반영된 문자예요');return false}
+ if(dupRecent(p,opt.t||Date.now())){say('같은 결제가 방금 반영돼서 건너뛰었어요');return false}
+ if(p.cancel)return cancelPay(p,opt.quiet);addPay(p,true,opt.quiet);return true}
+/* 안드로이드 전용 앱이 넘겨주는 알림: 금융 알림만 골라 자동 입력 */
+function finOk(it){const t=String(it.text||''),ti=String(it.title||''),p=String(it.pkg||''),all=ti+' '+t;
+ if(!t||t.length>1500)return false;
+ if(/\(광고\)|광고\]|이벤트|쿠폰|당첨|무료\s*체험|대출\s*(?:안내|상품)|한도\s*(?:상향|조회)/.test(all))return false;
+ if(/결제\s*예정|청구\s*금액|이용\s*대금|명세서|납부\s*안내|결제일|출금\s*예정|이체\s*예정/.test(all))return false;
+ if(!/승인|결제|출금|입금|취소|이체|송금|환불|사용/.test(all))return false;
+ if(!/\d[\d,]*\s*원|(?:입금|출금)\s*[:：]?\s*\d/.test(t))return false;
+ if(/kakao\.talk$/.test(p)&&!/카드|페이|뱅크|은행|토스|결제|승인|입금|출금/.test(ti))return false;
+ if(/messag|mms/i.test(p)&&!/\[(?:Web발신|국제발신|발신)\]|^\[[^\]]{2,14}\]/.test(t.trim()))return false;
+ return true}
+window.hjIngest=function(list){
+ try{if(typeof list=='string')list=JSON.parse(list)}catch(e){return 0}
+ if(!Array.isArray(list))return 0;let n=0;
+ for(const it of list){if(it&&finOk(it)&&autoPay(it.text,{t:+it.t||0,quiet:true}))n++}
+ return n};
+function drainNative(){
+ if(!NA||typeof NA.drain!='function')return;
+ try{const s=NA.drain();if(!s||s=='[]')return;
+  const n=window.hjIngest(s);if(typeof NA.ack=='function')NA.ack();
+  if(n)toast(`💳 결제·입금 알림 ${n}건을 기록했어요`)}catch(e){}}
 /* 붙여넣기 → 미리보기 → 추가 */
 $('pGo').onclick=()=>{const txt=$('pTxt').value,p=parsePay(txt),box=$('pPrev');
  if(!p){box.innerHTML='<p class="msg" style="margin:8px 0 0">금액(예: 4,500원)을 찾지 못했어요. 문자 전체를 그대로 붙여넣어 보세요.</p>';return}
  if(p.cancel){box.innerHTML=`<div class="pv"><b>↩️ 취소 문자예요</b><span class="note">${esc(p.memo||'결제')} ${won(p.amt)} · 같은 금액의 지출을 찾아 지워요.</span><button id="pOk">취소 반영하기</button></div>`;
   $('pOk').onclick=()=>{seenPay(txt,true);cancelPay(p);box.innerHTML='';$('pTxt').value=''};return}
- box.innerHTML=`<div class="pv"><b>💳 이렇게 추가할까요?</b><input type="date" id="pvD"><div class="row"><input type="number" inputmode="numeric" id="pvA"><select id="pvC" style="width:130px">${catOpts(p.cat)}</select></div><input id="pvM" maxlength="200" placeholder="내용"><button id="pOk">추가하기</button></div>`;
+ box.innerHTML=`<div class="pv"><b>💳 이렇게 추가할까요?</b><input type="date" id="pvD"><div class="row"><input type="number" inputmode="numeric" id="pvA"><select id="pvC" style="width:130px">${catOpts(p.cat,p.kind)}</select></div><input id="pvM" maxlength="200" placeholder="내용"><button id="pOk">추가하기</button></div>`;
  $('pvD').value=p.date;$('pvA').value=p.amt;$('pvM').value=p.memo;
  $('pOk').onclick=()=>{const a=parseInt($('pvA').value);if(!a||a<=0)return toast('금액을 확인해 주세요');
   if(seenPay(txt,false)&&!confirm('이미 추가한 문자예요. 한 번 더 추가할까요?'))return;
   seenPay(txt,true);const d=/^\d{4}-\d{2}-\d{2}$/.test($('pvD').value)?$('pvD').value:todayK;
-  addPay({amt:a,cat:$('pvC').value,memo:$('pvM').value.trim(),date:d},true);box.innerHTML='';$('pTxt').value=''}};
+  addPay({amt:a,kind:p.kind,cat:$('pvC').value,memo:$('pvM').value.trim(),date:d},true);box.innerHTML='';$('pTxt').value=''}};
 const payBase=location.origin&&location.origin!='null'?location.origin+location.pathname.replace(/[^\/]*$/,'')+'index.html#pay=':'(배포 주소)/index.html#pay=';
 $('pUrl').textContent=payBase+'{알림 내용}';
 $('pCopy').onclick=()=>{try{navigator.clipboard.writeText(payBase);toast('주소를 복사했어요. 뒤에 알림 내용 변수를 붙이세요')}catch(e){toast('복사하지 못했어요')}};
@@ -663,13 +756,13 @@ function views(p){
  if(v=='w'){
   const st=addDays(sel,-pk(sel).getDay());
   $(p+'RT').textContent=md(st)+' ~ '+md(addDays(st,6));
-  let h='',wt=0;
+  let h='',wt=0,wi=0;
   for(let i=0;i<7;i++){const k=addDays(st,i);let body;
    if(p=='s'){const l=(sched[k]||[]).slice().sort((a,b)=>(a.time||'').localeCompare(b.time||''));
     body=l.length?l.map(x=>(x.time?x.time+' ':'')+esc(x.title)+((x.ph||[]).length?' 📷':'')).join(' · '):'<span class="note">일정 없음</span>'}
-   else{const t=dayTotal(k);wt+=t;body=t?`<b>${won(t)}</b>`:'<span class="note">-</span>'}
+   else{const t=dayTotal(k),n=dayIn(k);wt+=t;wi+=n;body=t||n?(t?`<b>${won(t)}</b>`:'')+(n?` <b class="inc">+${won(n)}</b>`:''):'<span class="note">-</span>'}
    h+=`<div class="item wd ${k==sel?'s':''}" data-k="${k}"><div><b class="${i==0?'sun':''}">${md(k)} (${WD[i]})</b><div class="m" style="font-size:13px;color:var(--tx)">${body}</div></div></div>`}
-  if(p=='e')h+=`<div class="row sp" style="padding-top:10px"><span class="note">이 주 합계</span><b>${won(wt)}</b></div>`;
+  if(p=='e')h+=`<div class="row sp" style="padding-top:10px"><span class="note">이 주 합계</span><span><b>${won(wt)}</b>${wi?` <b class="inc">+${won(wi)}</b>`:''}</span></div>`;
   $(p+'Wk').innerHTML=h;
   $(p+'Wk').querySelectorAll('.wd').forEach(r=>r.onclick=()=>setSel(p,r.dataset.k));
  }else if(v=='d'){$(p+'RT').textContent=sel.replace(/-/g,'.')+' ('+WD[pk(sel).getDay()]+')';$(p+'Wk').innerHTML=''}
@@ -717,6 +810,7 @@ $('exp').onclick=async()=>{
  const photos={};
  for(const id of allPh()){try{const r=await pGet(id);if(r&&r.b)photos[id]=await b2d(r.b)}catch(e){}}
  const o={sched,exp,diary,photos,pw:store.get('hj_pw',null),demo};
+ if(NA&&typeof NA.saveBackup=='function'){const ok=NA.saveBackup('하루장부-백업-'+todayK+'.json',JSON.stringify(o));toast(ok?'다운로드 폴더에 저장했어요':'저장하지 못했어요');return}
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(o)],{type:'application/json'}));
  a.download='하루장부-백업-'+todayK+'.json';a.click()};
 $('imp').onclick=()=>$('file').click();
@@ -776,6 +870,7 @@ async function gSync(first){if(!tok||gBusy)return;gBusy=true;
  }catch(e){if(e.message!='auth')gst('동기화 실패: '+e.message)}finally{gBusy=false}}
 function gPushSoon(){if(!tok)return;clearTimeout(gTimer);gTimer=setTimeout(async()=>{if(!tok||gBusy)return;gBusy=true;try{if(!fileId)fileId=await gFind();await gUp();await gPhotos()}catch(e){if(e.message!='auth')gst('저장 실패: '+e.message)}finally{gBusy=false}},1500)}
 function gInit(){
+ if(NA){gst('안드로이드 앱에서는 구글 로그인을 쓸 수 없어요. 아래 "백업 저장"으로 기록을 보관해 주세요.');$('gBtn').disabled=true;return}
  if(!GCID){gst('구글 연동은 설정 준비 중이에요.');$('gBtn').disabled=true;return}
  if(!location.protocol.startsWith('http')){gst('배포 주소(https)에서만 사용할 수 있어요.');$('gBtn').disabled=true;return}
  gui();
@@ -791,6 +886,29 @@ function gInit(){
 gInit();
 
 sPhB=photoBox($('sPh'),sPhA);ePhB=photoBox($('ePh'),ePhA);
+
+/* ---- 안드로이드 전용 앱 연동 ---- */
+if(NA){
+ $('appCard').style.display='grid';$('install').style.display='none';
+ const st=()=>{try{const s=JSON.parse(NA.status());
+  $('appSt').textContent=(s.enabled?'✅ 알림 접근이 켜져 있어요':'⚠️ 알림 접근이 꺼져 있어요 — 아래 1번을 눌러 주세요')+` · 받은 알림 ${s.received}건`+(s.last?` · 마지막 ${new Date(s.last).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit'})}`:'')}catch(e){}};
+ $('appNotif').onclick=()=>NA.openListenerSettings();
+ $('appInfo').onclick=()=>NA.openAppInfo();
+ $('appBat').onclick=()=>NA.openBatterySettings();
+ st();setInterval(()=>{if(!document.hidden){drainNative();st()}},4000);
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden){drainNative();st()}});
+ drainNative();
+}
+/* 예시 데이터를 쓰던 사람에게 수입 예시를 한 번만 추가 */
+if(demo&&!store.get('hj_incdemo',false)){store.set('hj_incdemo',true);
+ let has=false;for(const k in exp)if((exp[k]||[]).some(isIn))has=true;
+ if(!has){const y=now.getFullYear(),m=now.getMonth();
+  for(const [yy,mm] of [[new Date(y,m-1,1).getFullYear(),new Date(y,m-1,1).getMonth()],[y,m]]){
+   const L=new Date(yy,mm+1,0).getDate();
+   for(const [d,a,c,me] of [[25,2800000,'월급','급여'],[5,150000,'용돈','용돈']]){
+    if(yy==y&&mm==m&&Math.min(d,L)>now.getDate())continue;
+    (exp[key(yy,mm,Math.min(d,L))]=exp[key(yy,mm,Math.min(d,L))]||[]).push({id:rid(),amt:a,kind:'in',cat:c,sub:'',memo:me,ph:[],auto:false})}}
+  save();store.set('hj_ts',0)}}
 banner();renderS();route();
 setTimeout(gcPhotos,5000);
 </script>
