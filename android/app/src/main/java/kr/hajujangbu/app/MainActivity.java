@@ -13,6 +13,7 @@ import android.provider.Settings;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -29,6 +30,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
+        getWindow().setFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE, android.view.WindowManager.LayoutParams.FLAG_SECURE); // 화면 캡처·최근 앱 미리보기에서 금액이 보이지 않게
         web = new WebView(this);
         setContentView(web);
 
@@ -37,21 +39,58 @@ public class MainActivity extends Activity {
         s.setDomStorageEnabled(true);
         s.setDatabaseEnabled(true);
         s.setAllowFileAccess(false);
-        s.setAllowContentAccess(true);
+        s.setAllowContentAccess(false);
+        s.setAllowFileAccessFromFileURLs(false);
+        s.setAllowUniversalAccessFromFileURLs(false);
+        s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        s.setSafeBrowsingEnabled(true);
+        s.setJavaScriptCanOpenWindowsAutomatically(false);
+        s.setSupportMultipleWindows(false);
+        s.setGeolocationEnabled(false);
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
         s.setUserAgentString(s.getUserAgentString() + " HajujangbuApp/1");
 
         web.addJavascriptInterface(new Bridge(this), "HJAndroid");
         web.setWebViewClient(new WebViewClient() {
+            private boolean mine(Uri u) {
+                return u != null && "https".equals(u.getScheme()) && HOST.equals(u.getHost());
+            }
+
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
                 Uri u = r.getUrl();
-                if ("https".equals(u.getScheme()) && HOST.equals(u.getHost())) return false;
-                try {
-                    startActivity(new Intent(Intent.ACTION_VIEW, u));
-                } catch (Exception ignored) {
+                if (mine(u)) return false;
+                // 바깥 주소는 앱 안에서 열지 않고, 안전한 종류(https·메일)만 기본 브라우저로 넘겨요
+                String sc = u == null ? "" : String.valueOf(u.getScheme());
+                if ("https".equals(sc) || "mailto".equals(sc)) {
+                    try {
+                        startActivity(new Intent(Intent.ACTION_VIEW, u));
+                    } catch (Exception ignored) {
+                    }
                 }
                 return true;
+            }
+
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest r) {
+                // 내 사이트 말고는 어디에도 연결하지 못하게 막아요 (알림 내용이 밖으로 새지 않게)
+                String sc = String.valueOf(r.getUrl().getScheme());
+                if (mine(r.getUrl()) || "blob".equals(sc) || "data".equals(sc)) return null;
+                return new WebResourceResponse("text/plain", "utf-8", 403, "Blocked", new java.util.HashMap<String, String>(),
+                        new java.io.ByteArrayInputStream(new byte[0]));
+            }
+
+            @Override
+            public void onPageStarted(WebView v, String url, android.graphics.Bitmap icon) {
+                if (!mine(Uri.parse(url))) {
+                    v.stopLoading();
+                    v.loadUrl(URL);
+                }
+            }
+
+            @Override
+            public void onReceivedSslError(WebView v, android.webkit.SslErrorHandler h, android.net.http.SslError e) {
+                h.cancel(); // 인증서가 이상하면 절대 진행하지 않아요
             }
         });
         web.setWebChromeClient(new WebChromeClient() {

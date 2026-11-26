@@ -2,6 +2,9 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: blob:; connect-src 'self' data: blob: https://www.googleapis.com https://accounts.google.com/gsi/; frame-src https://accounts.google.com/gsi/; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<script>if(window.top!==window.self){document.documentElement.innerHTML=''}</script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#3b6ef5">
 <link rel="manifest" href="manifest.json">
@@ -653,7 +656,10 @@ function route(){
  let h=location.hash.slice(1),q=new URLSearchParams(location.search),txt=null;
  if(/^pay=/.test(h)){txt=h.slice(4);try{txt=decodeURIComponent(txt)}catch(e){}}
  else if(q.get('pay'))txt=q.get('pay');
- if(txt!==null){history.replaceState(null,'',location.pathname);autoPay(txt);return}
+ if(txt!==null){history.replaceState(null,'',location.pathname);
+  if(NA)return;   // 안드로이드 앱은 알림을 직접 받아요. 링크로 들어온 결제 내용은 무시
+  if(!confirm('링크로 받은 결제 내용을 장부에 추가할까요?\n\n'+String(txt).replace(/\s+/g,' ').slice(0,80)))return;   // 남이 만든 링크로 가짜 지출이 들어오는 것 방지
+  autoPay(txt);return}
  if(h=='diary'||h=='exp'||h=='sched'){history.replaceState(null,'',location.pathname);tab(h=='diary'?'d':h=='exp'?'e':'s')}}
 window.addEventListener('hashchange',route);
 

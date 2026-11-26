@@ -30,7 +30,11 @@ final class Store {
         JSONArray a = arr(p, "pending");
         a.put(o);
         JSONArray cut = new JSONArray();
-        for (int i = Math.max(0, a.length() - MAX); i < a.length(); i++) cut.put(a.opt(i));
+        long old = System.currentTimeMillis() - 7L * 24 * 3600 * 1000; // 일주일 넘게 안 가져간 알림은 버려요
+        for (int i = Math.max(0, a.length() - MAX); i < a.length(); i++) {
+            JSONObject x = a.optJSONObject(i);
+            if (x != null && x.optLong("t", 0) >= old) cut.put(x);
+        }
         p.edit()
                 .putString("pending", cut.toString())
                 .putInt("received", p.getInt("received", 0) + 1)
