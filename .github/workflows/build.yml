@@ -1,0 +1,53 @@
+name: 안드로이드 앱 빌드
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: 서명 키 준비
+        env:
+          KS_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/hj.p12"
+            echo "KEYSTORE_PATH=$RUNNER_TEMP/hj.p12" >> "$GITHUB_ENV"
+          else
+            echo "::warning::KEYSTORE_B64 비밀값이 없어 임시 키로 서명해요 (업데이트 설치가 안 될 수 있어요)"
+          fi
+
+      - name: APK 빌드
+        env:
+          KEYSTORE_PASS: ${{ secrets.KEYSTORE_PASS }}
+        run: gradle -p android assembleRelease --no-daemon --stacktrace
+
+      - name: 릴리스 올리기
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk hajujangbu.apk
+          gh release delete apk-latest --yes --cleanup-tag || true
+          gh release create apk-latest hajujangbu.apk \
+            --title "하루장부 안드로이드 앱" \
+            --notes "폰에서 hajujangbu.apk 를 내려받아 설치하세요. 빌드 #${{ github.run_number }}"

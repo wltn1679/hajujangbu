@@ -1,0 +1,32 @@
+name: 서명 키 만들기 (한 번만)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  genkey:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: 키 만들기 (암호화해서 보관)
+        env:
+          ARTIFACT_PASS: ${{ secrets.ARTIFACT_PASS }}
+        run: |
+          set -e
+          PASS=$(openssl rand -hex 16)
+          keytool -genkeypair -keystore hj.p12 -storetype PKCS12 -alias hajujangbu \
+            -keyalg RSA -keysize 2048 -validity 36500 \
+            -storepass "$PASS" -keypass "$PASS" \
+            -dname "CN=Hajujangbu, O=Hajujangbu, C=KR" > /dev/null 2>&1
+          mkdir out
+          cp hj.p12 out/hj.p12
+          printf '%s' "$PASS" > out/pass.txt
+          tar czf - -C out . | openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:ARTIFACT_PASS -out key.enc
+      - uses: actions/upload-artifact@v4
+        with:
+          name: key
+          path: key.enc
+          retention-days: 1

@@ -1,0 +1,24 @@
+name: 웹 앱 테스트
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'tests/**'
+      - '.github/workflows/test.yml'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: 설치
+        run: npm install --no-save jsdom@24
+      - name: 결제 알림 해석·정산 테스트
+        run: node tests/run.js
