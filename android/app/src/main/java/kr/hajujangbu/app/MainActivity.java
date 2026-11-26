@@ -23,6 +23,9 @@ public class MainActivity extends Activity {
     static final String URL = "https://" + HOST + "/hajujangbu/";
     private static final int REQ_FILE = 1;
 
+    /** 지금 화면이 내 사이트일 때만 true. 브리지는 이때만 동작해요. */
+    static volatile boolean trusted = false;
+
     private WebView web;
     private ValueCallback<Uri[]> fileCb;
     private boolean askedThisRun = false;
@@ -53,22 +56,16 @@ public class MainActivity extends Activity {
         web.addJavascriptInterface(new Bridge(this), "HJAndroid");
         web.setWebViewClient(new WebViewClient() {
             private boolean mine(Uri u) {
-                return u != null && "https".equals(u.getScheme()) && HOST.equals(u.getHost());
+                // 주소는 https + 내 사이트 + 내 폴더(/hajujangbu/)만 허용 (같은 github.io 아래 다른 페이지는 거부)
+                return u != null && "https".equals(u.getScheme()) && HOST.equals(u.getHost())
+                        && u.getPath() != null && u.getPath().startsWith("/hajujangbu/") && u.getPort() == -1;
             }
 
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
-                Uri u = r.getUrl();
-                if (mine(u)) return false;
-                // 바깥 주소는 앱 안에서 열지 않고, 안전한 종류(https·메일)만 기본 브라우저로 넘겨요
-                String sc = u == null ? "" : String.valueOf(u.getScheme());
-                if ("https".equals(sc) || "mailto".equals(sc)) {
-                    try {
-                        startActivity(new Intent(Intent.ACTION_VIEW, u));
-                    } catch (Exception ignored) {
-                    }
-                }
-                return true;
+                // 바깥으로 나가는 이동은 전부 막아요. (페이지가 알림 내용을 주소에 실어 밖으로 보내는 것도 막기 위해
+                // 외부 브라우저·메일 앱 열기도 하지 않아요)
+                return !mine(r.getUrl());
             }
 
             @Override
@@ -82,12 +79,17 @@ public class MainActivity extends Activity {
 
             @Override
             public void onPageStarted(WebView v, String url, android.graphics.Bitmap icon) {
-                if (!mine(Uri.parse(url))) {
+                trusted = mine(Uri.parse(url));
+                if (!trusted) {
                     v.stopLoading();
                     v.loadUrl(URL);
                 }
             }
 
+            @Override
+            public void onPageFinished(WebView v, String url) {
+                trusted = mine(Uri.parse(String.valueOf(url)));
+            }
             @Override
             public void onReceivedSslError(WebView v, android.webkit.SslErrorHandler h, android.net.http.SslError e) {
                 h.cancel(); // 인증서가 이상하면 절대 진행하지 않아요

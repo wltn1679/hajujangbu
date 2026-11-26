@@ -23,16 +23,19 @@ final class Bridge {
 
     @JavascriptInterface
     public String drain() {
+        if (!MainActivity.trusted) return "[]";
         return Store.drain(act);
     }
 
     @JavascriptInterface
     public void ack() {
+        if (!MainActivity.trusted) return;
         Store.ack(act);
     }
 
     @JavascriptInterface
     public String status() {
+        if (!MainActivity.trusted) return "{}";
         try {
             JSONObject o = new JSONObject();
             o.put("enabled", NotifService.isEnabled(act));
@@ -46,11 +49,13 @@ final class Bridge {
 
     @JavascriptInterface
     public void openListenerSettings() {
+        if (!MainActivity.trusted) return;
         MainActivity.openListenerSettings(act);
     }
 
     @JavascriptInterface
     public void openAppInfo() {
+        if (!MainActivity.trusted) return;
         try {
             act.startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                     Uri.parse("package:" + act.getPackageName())));
@@ -60,11 +65,13 @@ final class Bridge {
 
     @JavascriptInterface
     public void openBatterySettings() {
+        if (!MainActivity.trusted) return;
         MainActivity.openBatterySettings(act);
     }
 
     @JavascriptInterface
     public boolean saveBackup(String name, String json) {
+        if (!MainActivity.trusted || json == null || json.length() > 40_000_000) return false; // 크기 제한
         try {
             String safe = name == null ? "hajujangbu-backup.json" : name.replaceAll("[^\\w가-힣.\\-]", "_");
             ContentValues v = new ContentValues();
