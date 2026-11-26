@@ -95,7 +95,7 @@ final class Bridge {
         if (!MainActivity.trusted || base64 == null || base64.length() > 16_000_000) return false;
         try {
             byte[] data = android.util.Base64.decode(base64, android.util.Base64.DEFAULT);
-            String safe = name == null ? "hajujangbu-photo.jpg" : name.replaceAll("[^\w가-힣.\-]", "_");
+            String safe = name == null ? "hajujangbu-photo.jpg" : name.replaceAll("[^\\w가-힣.\\-]", "_");
             ContentValues v = new ContentValues();
             v.put(MediaStore.Images.Media.DISPLAY_NAME, safe);
             v.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
