@@ -98,6 +98,7 @@ img.miss{opacity:.35}
 .lb{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:80;display:flex;align-items:center;justify-content:center}
 .lb img{max-width:100%;max-height:100%;object-fit:contain}
 .lb button{position:absolute;background:rgba(255,255,255,.18);color:#fff;border-radius:50%;width:44px;height:44px;padding:0;font-size:22px}
+.lbs,.lba{width:auto!important;border-radius:22px!important;padding:0 16px!important;font-size:15px!important;top:calc(12px + env(safe-area-inset-top));left:12px}.lba{left:110px}
 .lbx{top:calc(12px + env(safe-area-inset-top));right:12px}.lbp{left:10px;top:50%}.lbn{right:10px;top:50%}
 .lbc{position:absolute;bottom:calc(16px + env(safe-area-inset-bottom));left:0;right:0;text-align:center;color:#fff;font-size:13px}
 .toast{position:fixed;left:12px;right:12px;bottom:calc(78px + env(safe-area-inset-bottom));max-width:536px;margin:0 auto;background:#1d2433;color:#fff;border-radius:12px;padding:10px 12px;display:none;align-items:center;gap:8px;z-index:90;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.3)}
@@ -375,16 +376,27 @@ function wireList(el,arr,onEdit){hydrate(el);
 function lightbox(ids,i){
  if(!ids.length)return;let n=Math.max(0,i);
  const ov=document.createElement('div');ov.className='lb';
- ov.innerHTML='<img alt="사진"><button class="lbx" aria-label="닫기">✕</button><button class="lbp" aria-label="이전 사진">‹</button><button class="lbn" aria-label="다음 사진">›</button><div class="lbc"></div>';
+ ov.innerHTML='<img alt="사진"><button class="lbx" aria-label="닫기">✕</button><button class="lbs" aria-label="이 사진을 폰에 저장">⬇ 저장</button><button class="lba hide" aria-label="사진 모두 저장">전체 저장</button><button class="lbp" aria-label="이전 사진">‹</button><button class="lbn" aria-label="다음 사진">›</button><div class="lbc"></div>';
  const im=ov.querySelector('img');
  const show=()=>{const id=ids[n];ov.querySelector('.lbc').textContent=ids.length>1?(n+1)+' / '+ids.length:'';
-  ov.querySelector('.lbp').classList.toggle('hide',ids.length<2);ov.querySelector('.lbn').classList.toggle('hide',ids.length<2);
+  ov.querySelector('.lbp').classList.toggle('hide',ids.length<2);ov.querySelector('.lbn').classList.toggle('hide',ids.length<2);ov.querySelector('.lba').classList.toggle('hide',ids.length<2);
   if(pUrl[id]){im.src=pUrl[id];return}
   pGet(id).then(r=>{if(r&&r.b){pUrl[id]=URL.createObjectURL(r.b);if(ids[n]==id)im.src=pUrl[id]}})};
  const go=d=>{n=(n+d+ids.length)%ids.length;show()};
  const close=()=>{ov.remove();document.removeEventListener('keydown',kd)};
  const kd=e=>{if(e.key=='Escape')close();else if(e.key=='ArrowLeft')go(-1);else if(e.key=='ArrowRight')go(1)};
  document.addEventListener('keydown',kd);
+ /* 사진을 폰(갤러리/다운로드)에 다시 저장 */
+ const saveOne=async(id,k)=>{
+  const r=await pGet(id);if(!r||!r.b)return false;
+  const name='하루장부-사진-'+todayK.replace(/-/g,'')+'-'+(k+1)+'.jpg';
+  if(NA&&typeof NA.savePhoto=='function'){const d=await b2d(r.b);return NA.savePhoto(name,d.slice(d.indexOf(',')+1))}
+  const u=URL.createObjectURL(r.b),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(u),4000);return true};
+ ov.querySelector('.lbs').onclick=async()=>{let ok=false;try{ok=await saveOne(ids[n],n)}catch(e){}
+  toast(ok?(NA?'갤러리(Pictures/하루장부)에 저장했어요':'사진을 저장했어요 (다운로드 폴더)'):'저장하지 못했어요')};
+ ov.querySelector('.lba').onclick=async()=>{let c=0;for(let k=0;k<ids.length;k++){try{if(await saveOne(ids[k],k))c++}catch(e){}}
+  toast(c?`사진 ${c}장을 저장했어요`:'저장하지 못했어요')};
  ov.querySelector('.lbx').onclick=close;ov.querySelector('.lbp').onclick=()=>go(-1);ov.querySelector('.lbn').onclick=()=>go(1);
  ov.onclick=e=>{if(e.target===ov)close()};
  let sx=0;ov.ontouchstart=e=>{sx=e.touches[0].clientX};

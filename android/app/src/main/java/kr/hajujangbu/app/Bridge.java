@@ -89,4 +89,26 @@ final class Bridge {
             return false;
         }
     }
+
+    @JavascriptInterface
+    public boolean savePhoto(String name, String base64) {
+        if (!MainActivity.trusted || base64 == null || base64.length() > 16_000_000) return false;
+        try {
+            byte[] data = android.util.Base64.decode(base64, android.util.Base64.DEFAULT);
+            String safe = name == null ? "hajujangbu-photo.jpg" : name.replaceAll("[^\w가-힣.\-]", "_");
+            ContentValues v = new ContentValues();
+            v.put(MediaStore.Images.Media.DISPLAY_NAME, safe);
+            v.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+            v.put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/하루장부");
+            Uri u = act.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v);
+            if (u == null) return false;
+            try (OutputStream os = act.getContentResolver().openOutputStream(u)) {
+                if (os == null) return false;
+                os.write(data);
+            }
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
 }

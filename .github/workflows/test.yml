@@ -22,6 +22,6 @@ jobs:
         with:
           node-version: '20'
       - name: 설치
-        run: npm install --no-save jsdom@24
+        run: npm install --no-save jsdom@24 fake-indexeddb@6
       - name: 결제 알림 해석·정산 테스트
         run: node tests/run.js

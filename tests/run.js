@@ -91,6 +91,50 @@ const ok = (c, msg) => { if (!c) { fail++; console.log('  ✗ ' + msg); } else c
   const net = w.document.getElementById('setN').textContent;
   ok(/^\+2,845,500원$/.test(net), `남은 돈 +2,845,500원 (${net})`);
 
+  console.log('사진 다시 저장');
+  const { indexedDB: fakeIDB } = require('fake-indexeddb');
+  const mkDom = (withNA) => {
+    const out = { errs: [], saved: [], dl: [] };
+    const v2 = new VirtualConsole();
+    v2.on('jsdomError', (e) => out.errs.push(String(e && e.stack || e)));
+    const d = new JSDOM(html, {
+      url: 'https://wltn1679.github.io/hajujangbu/', runScripts: 'dangerously', pretendToBeVisual: true, virtualConsole: v2,
+      beforeParse(w) {
+        w.localStorage.setItem('hj_sched', '{}'); w.localStorage.setItem('hj_exp', '{}');
+        w.matchMedia = () => ({ matches: false, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {} });
+        w.scrollTo = () => {};
+        w.indexedDB = fakeIDB;
+        w.URL.createObjectURL = () => 'blob:test'; w.URL.revokeObjectURL = () => {};
+        w.HTMLAnchorElement.prototype.click = function () { if (this.download) out.dl.push(this.download); };
+        w.FileReader = class { readAsDataURL(b) { b.arrayBuffer().then((buf) => { this.result = 'data:image/jpeg;base64,' + Buffer.from(buf).toString('base64'); this.onload && this.onload(); }); } };
+        if (withNA) w.HJAndroid = { drain: () => '[]', ack() {}, status: () => '{"enabled":true,"received":0,"last":0}', openListenerSettings() {}, openAppInfo() {}, openBatterySettings() {}, saveBackup: () => true, savePhoto: (n, b) => { out.saved.push([n, b]); return true; } };
+      },
+    });
+    out.w = d.window; return out;
+  };
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  for (const withNA of [false, true]) {
+    const t = mkDom(withNA); const pw = t.w;
+    await wait(300);
+    pw.__blob = new Blob(['hello-photo'], { type: 'image/jpeg' });
+    await pw.eval("pPut('p1',window.__blob)"); await pw.eval("pPut('p2',window.__blob)");
+    pw.eval("lightbox(['p1','p2'],0)");
+    await wait(100);
+    const lb = pw.document.querySelector('.lb');
+    ok(!!(lb && lb.querySelector('.lbs')), `[${withNA ? '앱' : '브라우저'}] 저장 버튼이 보임`);
+    ok(lb && !lb.querySelector('.lba').classList.contains('hide'), `[${withNA ? '앱' : '브라우저'}] 사진 2장이면 전체 저장 버튼이 보임`);
+    lb.querySelector('.lbs').click(); await wait(300);
+    const n1 = withNA ? t.saved.length : t.dl.length;
+    ok(n1 === 1, `[${withNA ? '앱' : '브라우저'}] 한 장 저장 (${n1})`);
+    lb.querySelector('.lba').click(); await wait(500);
+    const n2 = withNA ? t.saved.length : t.dl.length;
+    ok(n2 === 3, `[${withNA ? '앱' : '브라우저'}] 전체 저장까지 총 3건 (${n2})`);
+    const first = withNA ? t.saved[0][0] : t.dl[0];
+    ok(/^하루장부-사진-\d{8}-1\.jpg$/.test(first), `파일 이름 형식 (${first})`);
+    if (withNA) ok(Buffer.from(t.saved[0][1], 'base64').toString() === 'hello-photo', '앱으로 넘기는 사진 내용이 원본과 같음');
+    ok(t.errs.length === 0, `[${withNA ? '앱' : '브라우저'}] 오류 없음` + (t.errs.length ? '\n' + t.errs.join('\n') : ''));
+  }
+
   console.log('화면 그리기');
   ev("tab('e')");
   w.localStorage.setItem('hj_open', 'true');
