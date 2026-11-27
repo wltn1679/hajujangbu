@@ -111,4 +111,32 @@ final class Bridge {
             return false;
         }
     }
+
+    @JavascriptInterface
+    public boolean googleConfigured() {
+        return MainActivity.trusted && GoogleAuth.configured(act);
+    }
+
+    @JavascriptInterface
+    public boolean googleSignedIn() {
+        return MainActivity.trusted && GoogleAuth.signedIn(act);
+    }
+
+    @JavascriptInterface
+    public void googleSignIn() {
+        if (!MainActivity.trusted) return;
+        GoogleAuth.start(act);
+    }
+
+    @JavascriptInterface
+    public String googleToken() {
+        if (!MainActivity.trusted) return "";
+        return GoogleAuth.token(act);
+    }
+
+    @JavascriptInterface
+    public void googleSignOut() {
+        if (!MainActivity.trusted) return;
+        GoogleAuth.signOut(act);
+    }
 }

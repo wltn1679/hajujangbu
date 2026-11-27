@@ -874,7 +874,7 @@ async function gPhotos(){
  for(const id of down){gst(`☁️ 사진 동기화 중 ${++n}/${tot}`);
   const b=await(await gf(`https://www.googleapis.com/drive/v3/files/${remote['ph_'+id+'.jpg']}?alt=media`)).blob();await pPut(id,b)}
  if(tot){gst('☁️ 동기화됨 · '+new Date().toLocaleTimeString('ko-KR'));if(down.length)refresh()}}
-async function gSync(first){if(!tok||gBusy)return;gBusy=true;
+async function gSync(first){if(NA&&NA.googleSignedIn&&NA.googleSignedIn()){const t=NA.googleToken();if(t)tok=t}if(!tok||gBusy)return;gBusy=true;
  try{gst('동기화 중…');if(!fileId)fileId=await gFind();
   if(!fileId)await gUp();
   else{
@@ -886,8 +886,17 @@ async function gSync(first){if(!tok||gBusy)return;gBusy=true;
    else gst('☁️ 최신 상태예요')}
   await gPhotos()
  }catch(e){if(e.message!='auth')gst('동기화 실패: '+e.message)}finally{gBusy=false}}
-function gPushSoon(){if(!tok)return;clearTimeout(gTimer);gTimer=setTimeout(async()=>{if(!tok||gBusy)return;gBusy=true;try{if(!fileId)fileId=await gFind();await gUp();await gPhotos()}catch(e){if(e.message!='auth')gst('저장 실패: '+e.message)}finally{gBusy=false}},1500)}
+function gPushSoon(){if(!tok)return;clearTimeout(gTimer);gTimer=setTimeout(async()=>{if(NA&&NA.googleSignedIn&&NA.googleSignedIn()){const t=NA.googleToken();if(t)tok=t}if(!tok||gBusy)return;gBusy=true;try{if(!fileId)fileId=await gFind();await gUp();await gPhotos()}catch(e){if(e.message!='auth')gst('저장 실패: '+e.message)}finally{gBusy=false}},1500)}
 function gInit(){
+ if(NA&&NA.googleConfigured&&NA.googleConfigured()){   // 안드로이드 앱: 기본 브라우저로 로그인하고 앱으로 돌아와요 (앱 안 웹뷰는 구글이 막음)
+  const grab=()=>{const t=NA.googleToken();if(t){tok=t;store.set('hj_g',1);gui();return true}return false};
+  window.hjG=()=>{if(grab())gSync(true)};
+  window.hjGFail=()=>{gst('로그인을 마치지 못했어요. 다시 시도해 주세요.')};
+  $('gBtn').onclick=()=>{if(tok||grab())gSync(false);else{gst('브라우저에서 로그인한 뒤 앱으로 돌아와 주세요…');NA.googleSignIn()}};
+  $('gOut').onclick=()=>{NA.googleSignOut();tok=null;fileId=null;store.set('hj_g',0);gst('로그아웃했어요. 이 기기의 기록은 그대로 남아 있어요.');gui();$('gOut').classList.add('hide')};
+  gui();if(NA.googleSignedIn()&&grab())gSync(true);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(NA.googleSignedIn())grab();if(tok)gSync(false)}});
+  return}
  if(NA){gst('안드로이드 앱에서는 구글 로그인을 쓸 수 없어요. 아래 "백업 저장"으로 기록을 보관해 주세요.');$('gBtn').disabled=true;return}
  if(!GCID){gst('구글 연동은 설정 준비 중이에요.');$('gBtn').disabled=true;return}
  if(!location.protocol.startsWith('http')){gst('배포 주소(https)에서만 사용할 수 있어요.');$('gBtn').disabled=true;return}

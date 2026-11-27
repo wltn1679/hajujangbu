@@ -25,6 +25,13 @@ public class MainActivity extends Activity {
 
     /** 지금 화면이 내 사이트일 때만 true. 브리지는 이때만 동작해요. */
     static volatile boolean trusted = false;
+    private static volatile WebView WEB;
+
+    /** 화면(웹)에 자바스크립트 한 줄을 알려요 (로그인 끝남 등) */
+    static void notifyJs(final String js) {
+        final WebView w = WEB;
+        if (w != null) w.post(() -> w.evaluateJavascript(js, null));
+    }
 
     private WebView web;
     private ValueCallback<Uri[]> fileCb;
@@ -35,6 +42,7 @@ public class MainActivity extends Activity {
         super.onCreate(b);
         getWindow().setFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE, android.view.WindowManager.LayoutParams.FLAG_SECURE); // 화면 캡처·최근 앱 미리보기에서 금액이 보이지 않게
         web = new WebView(this);
+        WEB = web;
         setContentView(web);
 
         WebSettings s = web.getSettings();
@@ -55,6 +63,7 @@ public class MainActivity extends Activity {
 
         web.addJavascriptInterface(new Bridge(this), "HJAndroid");
         web.setWebViewClient(new WebViewClient() {
+/** 구글 드라이브 API(이 앱 전용 폴더 저장용)만 예외로 허용 */            private boolean drive(Uri u) {                return u != null && "https".equals(u.getScheme()) && "www.googleapis.com".equals(u.getHost()) && u.getPath() != null                        && (u.getPath().startsWith("/drive/v3/") || u.getPath().startsWith("/upload/drive/v3/"));            }
             private boolean mine(Uri u) {
                 // 주소는 https + 내 사이트 + 내 폴더(/hajujangbu/)만 허용 (같은 github.io 아래 다른 페이지는 거부)
                 return u != null && "https".equals(u.getScheme()) && HOST.equals(u.getHost())
@@ -72,7 +81,7 @@ public class MainActivity extends Activity {
             public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest r) {
                 // 내 사이트 말고는 어디에도 연결하지 못하게 막아요 (알림 내용이 밖으로 새지 않게)
                 String sc = String.valueOf(r.getUrl().getScheme());
-                if (mine(r.getUrl()) || "blob".equals(sc) || "data".equals(sc)) return null;
+                if (mine(r.getUrl()) || drive(r.getUrl()) || "blob".equals(sc) || "data".equals(sc)) return null;
                 return new WebResourceResponse("text/plain", "utf-8", 403, "Blocked", new java.util.HashMap<String, String>(),
                         new java.io.ByteArrayInputStream(new byte[0]));
             }
@@ -110,10 +119,18 @@ public class MainActivity extends Activity {
             }
         });
 
+        GoogleAuth.handleRedirect(this, getIntent() == null ? null : getIntent().getData());
         if (b != null) web.restoreState(b);
         else web.loadUrl(URL);
     }
 
+
+    @Override
+    protected void onNewIntent(Intent i) {
+        super.onNewIntent(i);
+        setIntent(i);
+        GoogleAuth.handleRedirect(this, i.getData());
+    }
     @Override
     protected void onSaveInstanceState(Bundle out) {
         super.onSaveInstanceState(out);
